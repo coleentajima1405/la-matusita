@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<title>La Casa Matusita</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Nosifer&family=Special+Elite&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- static / creepy filter over the whole screen -->
+<div id="static" aria-hidden="true"></div>
+
+<!-- sound and fullscreen buttons -->
+<div id="tools">
+  <button id="full" aria-label="Fullscreen">⛶</button>
+  <button id="mute" aria-label="Toggle sound">🔊</button>
+</div>
+
+<!-- start screen -->
+<section id="start" class="screen menu active">
+  <div class="in">
+    <h1>La Casa Matusita</h1>
+    <p class="tag">Solve every room before the house keeps you.</p>
+    <div>
+      <button id="btnStart" class="btn">Start</button>
+      <button id="btnHow" class="btn ghost">How to play</button>
+    </div>
+    <p class="small">Best score: <b id="bestStart">0</b></p>
+  </div>
+</section>
+
+<!-- instructions screen -->
+<section id="how" class="screen menu">
+  <div class="in">
+    <h2>How to play</h2>
+    <ul class="rules">
+      <li>The house has 7 rooms. Each room has 3 glowing objects and one countdown.</li>
+      <li>Tap a glowing object to open its puzzle. Solve all 3 before time runs out to unlock the next room.</li>
+      <li>Every room is harder: less time and trickier puzzles.</li>
+      <li>Each puzzle gives points (400 to 600) plus 5 points for every second left.</li>
+      <li>A wrong answer costs 5 seconds. If time hits zero, the house gets you.</li>
+      <li>Controls: mouse, touch, or keyboard (type answers, press Enter).</li>
+      <li>Escape all 7 rooms to win. Your best score is saved in this browser.</li>
+    </ul>
+    <div>
+      <button id="btnBack" class="btn ghost">Back</button>
+      <button id="btnGo" class="btn">Enter the house</button>
+    </div>
+  </div>
+</section>
+
+<!-- game screen (room picture + puzzle popup) -->
+<section id="game" class="screen">
+  <header id="hud">
+    <span>Room <b id="hRoom">1</b>/7 <b id="hName"></b></span>
+    <span>Found <b id="hSolved">0</b>/3</span>
+    <span>Score <b id="hScore">0</b></span>
+    <span class="opt">Best <b id="hBest">0</b></span>
+    <span id="timeText"></span>
+  </header>
+  <div id="bar"><i id="barFill"></i></div>
+  <div id="view"><div id="stage"></div></div>
+  <p id="tip">Tip: rotate your phone sideways for a bigger view.</p>
+
+  <!-- layout editor (only with ?edit in the address) -->
+  <div id="editbar" hidden>
+    <b id="eRoom"></b>
+    <button id="ePrev" class="btn ghost">◀ Prev</button>
+    <button id="eNext" class="btn ghost">Next ▶</button>
+    <button id="eCopy" class="btn">Copy layout</button>
+    <small>drag = move, mouse wheel = resize</small>
+    <textarea id="eOut" readonly rows="3" aria-label="Layout code"></textarea>
+  </div>
+
+  <!-- puzzle popup -->
+  <div id="modal" hidden>
+    <div class="box">
+      <button id="close" class="btn ghost" aria-label="Close puzzle">✕</button>
+      <h2 id="pTitle"></h2>
+      <p id="pHint"></p>
+      <div id="puzzle"></div>
+      <p id="msg" role="status"></p>
+    </div>
+  </div>
+</section>
+
+<!-- game over screen -->
+<section id="over" class="screen menu">
+  <div class="in">
+    <h2 id="oTitle"></h2>
+    <p id="oText"></p>
+    <p>Score <b id="oScore"></b> &nbsp; Rooms cleared <b id="oRoom"></b></p>
+    <p id="oBest"></p>
+    <div id="saveBox">
+      <label for="initials">Your initials</label>
+      <div class="row">
+        <input id="initials" maxlength="3" autocomplete="off" placeholder="ABC">
+        <button id="btnSave" class="btn">Save score</button>
+      </div>
+    </div>
+    <h3>Scoreboard</h3>
+    <ol id="board"></ol>
+    <div><button id="btnRestart" class="btn">Play again</button></div>
+  </div>
+</section>
+
+<!-- jumpscare overlay -->
+<div id="scare" aria-hidden="true">
+  <img id="scareImg" alt="">
+  <div class="face"><span class="eye l"></span><span class="eye r"></span><span class="mouth"></span></div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
