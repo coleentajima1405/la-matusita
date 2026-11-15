@@ -1,81 +1,166 @@
-/* =====================================================
-   la casa matusita - style.css
-   ===================================================== */
+/* ============================================================
+   la casa matusita
+   ------------------------------------------------------------
+    1. theme and base           8. layout editor (?edit)
+    2. screens                  9. puzzle popup
+    3. buttons and inputs      10. puzzles (candles, cards, riddle, lock)
+    4. top bar and timer       11. jumpscare
+    5. room picture            12. static filter
+    6. cctv camera look        13. animations and small screens
+    7. glowing objects
+   ============================================================ */
 
-/* ===== theme colors ===== */
-:root{--h:18;--hud:52px;--panel:hsl(var(--h) 25% 6%);--blood:#8f0e14;--bloodhi:#d01a22;--bone:#d9d0b8;--ghost:#9fe3c0;--candle:#d9a441;--dim:#8a806d}
 
-/* ===== base ===== */
+/* ============================================================
+   1. theme and base
+   ============================================================ */
+:root{
+  --h:18;                                      /* room hue (changes in every room) */
+  --hud:52px;                                  /* height used by the top bar */
+  --panel:hsl(var(--h) 25% 6%);
+  --blood:#8f0e14; --bloodhi:#d01a22;          /* reds */
+  --bone:#d9d0b8;  --dim:#8a806d;              /* text */
+  --ghost:#9fe3c0; --candle:#d9a441;           /* glow colors */
+  --noise:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");   /* grain picture */
+}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
 html,body{margin:0;height:100%;overscroll-behavior:none}
 body{background:radial-gradient(ellipse at 50% 10%,hsl(var(--h) 35% 11%),#030101 75%);color:var(--bone);font-family:'Special Elite',Georgia,serif;font-size:16px;line-height:1.5;touch-action:manipulation;transition:background .6s}
 body.edit{--hud:200px}
-h1,h2,h3{font-family:'Creepster',Georgia,serif;font-weight:400;letter-spacing:.04em;margin:.3em 0;color:var(--bloodhi);text-shadow:0 0 14px #8f0e14}
-h1{font-family:'Nosifer',Georgia,serif;font-size:clamp(1.9rem,8.5vw,4.2rem);line-height:1.25;color:#b3121a;text-shadow:0 0 10px #f00,0 0 36px #600;animation:flicker 4s infinite,tremble 5s infinite}
-h2{font-size:clamp(1.8rem,6vw,2.6rem)}
 :focus-visible{outline:2px solid var(--ghost);outline-offset:2px}
 
-/* ===== screens (every screen fills the whole window, each with a room picture behind it) ===== */
+h1,h2,h3{font-family:'Creepster',Georgia,serif;font-weight:400;letter-spacing:.04em;margin:.3em 0;color:var(--bloodhi);text-shadow:0 0 14px var(--blood)}
+h1{font-family:'Nosifer',Georgia,serif;font-size:clamp(1.9rem,8.5vw,4.2rem);line-height:1.25;color:#b3121a;text-shadow:0 0 10px #f00,0 0 36px #600;animation:flicker 4s infinite,tremble 5s infinite}
+h2{font-size:clamp(1.8rem,6vw,2.6rem)}
+
+
+/* ============================================================
+   2. screens (each one fills the whole window)
+   ============================================================ */
 .screen{display:none;position:fixed;inset:0}
 .screen.active{display:block}
 .menu{overflow:auto;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
 .menu .in{max-width:640px;min-height:100%;margin:0 auto;display:flex;flex-direction:column;justify-content:center}
+
+/* room pictures behind the menus */
 #start{background:linear-gradient(#000a,#000e 92%),url(rooms/foyer.jpg) center/cover}
 #how{background:linear-gradient(#000c,#000e),url(rooms/library.jpg) center/cover}
 #over{background:linear-gradient(#000b,#000e),url(rooms/cellar.jpg) center/cover}
-.tag{color:var(--dim);margin-bottom:1.4em;font-style:italic}.small{color:var(--dim);margin-top:1.4em}
-.rules{padding-left:1.1em}.rules li{margin:.45em 0}.rules li::marker{color:var(--bloodhi)}
 
-/* ===== buttons and inputs ===== */
-.btn{font:inherit;font-size:.9rem;text-transform:uppercase;letter-spacing:.12em;background:linear-gradient(#5d0a0f,#2a0306);color:var(--bone);border:1px solid #d01a2299;padding:.75em 1.5em;min-height:44px;margin:.3em .5em .3em 0;cursor:pointer;text-shadow:0 0 8px #000;transition:background .15s;clip-path:polygon(0 8%,4% 0,30% 6%,60% 0,96% 5%,100% 30%,97% 70%,100% 94%,70% 100%,35% 94%,4% 100%,0 70%,2% 35%)}
+.tag{color:var(--dim);margin-bottom:1.4em;font-style:italic}
+.small{color:var(--dim);margin-top:1.4em}
+.rules{padding-left:1.1em}
+.rules li{margin:.45em 0}
+.rules li::marker{color:var(--bloodhi)}
+#saveBox{margin:1em 0}
+#board{padding-left:1.4em}
+#board li{margin:.15em 0}
+
+
+/* ============================================================
+   3. buttons and inputs
+   ============================================================ */
+.btn{font:inherit;font-size:.9rem;text-transform:uppercase;letter-spacing:.12em;background:linear-gradient(#5d0a0f,#2a0306);color:var(--bone);border:1px solid #d01a2299;padding:.75em 1.5em;min-height:44px;margin:.3em .5em .3em 0;cursor:pointer;text-shadow:0 0 8px #000;transition:background .15s;clip-path:polygon(0 8%,4% 0,30% 6%,60% 0,96% 5%,100% 30%,97% 70%,100% 94%,70% 100%,35% 94%,4% 100%,0 70%,2% 35%)}   /* torn edges */
 .btn:hover{background:linear-gradient(#a3121a,#4a0509)}
-.btn.ghost{background:transparent;border-color:#d9d0b866}.btn.ghost:hover{background:#ffffff14}
+.btn.ghost{background:transparent;border-color:#d9d0b866}
+.btn.ghost:hover{background:#ffffff14}
 .row{display:flex;gap:8px}
 input{flex:1;min-width:0;font:inherit;font-size:16px;padding:.6em .8em;background:#000;color:var(--bone);border:1px solid #5d0a0f;border-radius:2px}
 label{display:block;color:var(--dim);margin-bottom:6px}
-#saveBox{margin:1em 0}#board{padding-left:1.4em}#board li{margin:.15em 0}
 
-/* ===== sound and fullscreen buttons ===== */
+/* sound and fullscreen buttons */
 #tools{position:fixed;top:max(6px,env(safe-area-inset-top));right:max(6px,env(safe-area-inset-right));z-index:60;display:flex;gap:6px}
-#tools button{width:38px;height:38px;background:#000b;border:1px solid #8f0e14;color:var(--bone);border-radius:50%;cursor:pointer}
+#tools button{width:38px;height:38px;background:#000b;border:1px solid var(--blood);color:var(--bone);border-radius:50%;cursor:pointer}
 
-/* ===== game layout: top bar + room picture ===== */
+
+/* ============================================================
+   4. top bar and timer
+   ============================================================ */
 #game.active{display:flex;flex-direction:column;background:#000}
 #hud{height:46px;display:flex;align-items:center;gap:6px 18px;padding:0 100px 0 12px;font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;overflow:hidden;color:#a39880;background:linear-gradient(#000,#150506);border-bottom:1px solid #5d0a0f}
 #hud b{color:var(--bone)}
-#timeText{margin-left:auto;font-family:'Creepster',serif;font-size:1.4rem;letter-spacing:.05em;color:var(--bloodhi);text-shadow:0 0 10px #d01a22}
-body.danger #timeText{animation:tremble .3s infinite}
+#timeText{margin-left:auto;font-family:'Creepster',serif;font-size:1.4rem;letter-spacing:.05em;color:var(--bloodhi);text-shadow:0 0 10px var(--bloodhi)}
 #bar{height:6px;background:#1a0a0a}
-#barFill{display:block;height:100%;width:100%;background:linear-gradient(90deg,#5d0a0f,#d01a22);box-shadow:0 0 12px #d01a22;transition:width .1s linear}
+#barFill{display:block;height:100%;width:100%;background:linear-gradient(90deg,#5d0a0f,var(--bloodhi));box-shadow:0 0 12px var(--bloodhi);transition:width .1s linear}
+
+/* last 10 seconds: red pulse around the screen */
+body.danger #timeText{animation:tremble .3s infinite}
 body.danger::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:30;box-shadow:inset 0 0 160px 40px rgba(163,25,29,.65);animation:pulse 1s infinite}
-#game.hit{animation:hit .3s}
-#view{flex:1;min-height:0;display:grid;place-items:center}
+#game.hit{animation:hit .3s}                      /* shake after a wrong answer */
 #tip{display:none;margin:0;padding:8px;text-align:center;color:var(--dim);font-size:.8rem}
 
-/* ===== room picture (the box fits the shape of each picture) ===== */
+
+/* ============================================================
+   5. room picture (the box fits the shape of each picture)
+   ============================================================ */
+#view{flex:1;min-height:0;display:grid;place-items:center}
 #stage{--ar:1.7778;position:relative;aspect-ratio:var(--ar);width:min(100%,calc((100dvh - var(--hud)) * var(--ar)));container-type:inline-size;overflow:hidden;background-size:100% 100%,cover;background-position:center;background-repeat:no-repeat}
-#stage::before{content:attr(data-room);position:absolute;inset:0;display:grid;place-items:center;font-family:'Creepster',serif;font-size:10cqw;opacity:.12}   /* shows only when the picture is missing */
+
+/* room name (only visible when the picture is missing) */
+#stage::before{content:attr(data-room);position:absolute;inset:0;display:grid;place-items:center;font-family:'Creepster',serif;font-size:10cqw;opacity:.12}
 #stage.has-img::before{display:none}
-#stage::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(circle at var(--mx,50%) var(--my,55%),transparent 0,transparent 12cqw,rgba(0,0,0,.82) 38cqw)}   /* flashlight: the room is dark except around your finger / mouse */
+
+/* flashlight: dark everywhere except around your finger / mouse */
+#stage::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(circle at var(--mx,50%) var(--my,55%),transparent 0,transparent 12cqw,rgba(0,0,0,.82) 38cqw)}
 #stage.nolight::after{display:none}
 
-/* ===== glowing objects (no box: the glow follows the shape of the object, size comes from --s) ===== */
+
+/* ============================================================
+   6. cctv camera look (curved picture is made in script.js)
+   ============================================================ */
+#spots{position:absolute;inset:0}
+#stage{animation:camjit 9s infinite}                                   /* the camera picture jumps now and then */
+
+#cctv{position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden;font-size:max(1.5cqw,11px);letter-spacing:.14em;text-transform:uppercase;color:#ececec;text-shadow:0 0 6px #000}
+#cctv::before{content:'';position:absolute;inset:0;background:rgba(90,130,105,.16);mix-blend-mode:color}   /* gray-green camera color */
+#cctv::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 52%,rgba(0,0,0,.75) 100%);box-shadow:inset 0 0 7cqw 1cqw #000}   /* dark lens edges */
+
+#cctv .tl{position:absolute;left:3.5cqw;top:3cqw;display:grid;gap:.4em}
+#cctv .rec{display:flex;align-items:center;gap:.6em;color:#ff4040}
+#cctv .rec i{width:1.1em;height:1.1em;border-radius:50%;background:#ff2020;box-shadow:0 0 10px #f00;animation:blink 1.2s steps(1) infinite}
+#camTime{position:absolute;right:3.5cqw;top:3cqw}
+#cctv .bl{position:absolute;left:3.5cqw;bottom:3cqw;opacity:.65;font-size:.8em}
+
+/* viewfinder corners */
+#cctv .c{position:absolute;width:3.5cqw;height:3.5cqw;border:0 solid rgba(255,255,255,.55)}
+#cctv .ctl{left:2cqw;top:2cqw;border-width:2px 0 0 2px}
+#cctv .ctr{right:2cqw;top:2cqw;border-width:2px 2px 0 0}
+#cctv .cbl{left:2cqw;bottom:2cqw;border-width:0 0 2px 2px}
+#cctv .cbr{right:2cqw;bottom:2cqw;border-width:0 2px 2px 0}
+
+/* static burst when the camera switches to a new room */
+#cctv .burst{position:absolute;inset:0;opacity:0;background:var(--noise),#111;background-size:220px}
+#stage.switch .burst{animation:burst .6s steps(6)}
+
+
+/* ============================================================
+   7. glowing objects (no box, the glow follows the object shape)
+   ============================================================ */
 .spot{position:absolute;z-index:2;width:max(calc(var(--s,10) * 1cqw),34px);aspect-ratio:1;transform:translate(-50%,-50%);padding:3px;border:0;background:none;display:grid;place-items:center;font-size:max(4cqw,20px);text-shadow:0 0 14px var(--ghost),0 0 28px var(--ghost);cursor:pointer;touch-action:none}
 .spot img{width:100%;height:100%;object-fit:contain;pointer-events:none;animation:glow 2s ease-in-out infinite}
-.spot img.raw{mix-blend-mode:screen;-webkit-mask-image:radial-gradient(closest-side,#000 62%,transparent 100%);mask-image:radial-gradient(closest-side,#000 62%,transparent 100%)}   /* backup when the browser blocks the cut-out */
+/* backup when the cut-out is blocked: feather the edges */
+.spot img.raw{-webkit-mask-image:radial-gradient(closest-side,#000 70%,transparent 100%);mask-image:radial-gradient(closest-side,#000 70%,transparent 100%)}
 .spot:hover img,.spot:focus-visible img{animation:none;filter:drop-shadow(0 0 6px #fff) drop-shadow(0 0 18px var(--ghost)) drop-shadow(0 0 36px var(--ghost))}
+
+/* solved object: gray with a check mark */
 .spot.done{cursor:default;text-shadow:none}
 .spot.done img{animation:none;filter:grayscale(1) brightness(.4)}
 .spot.done::after{content:'✔';position:absolute;right:0;bottom:0;font-size:1.1rem;color:var(--ghost);text-shadow:none}
-body.edit .spot{cursor:grab;outline:2px dashed var(--ghost)}
 
-/* ===== layout editor (?edit) ===== */
+
+/* ============================================================
+   8. layout editor (?edit)
+   ============================================================ */
+body.edit .spot{cursor:grab;outline:2px dashed var(--ghost)}
 #editbar{padding:6px 10px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;background:#111;font-size:.85rem}
 #editbar .btn{min-height:36px;padding:.3em .9em}
 #eOut{flex:1 1 100%;font:12px monospace;background:#000;color:var(--ghost);border:1px solid #fff3;height:84px}
 
-/* ===== puzzle popup (an old note in the dark) ===== */
+
+/* ============================================================
+   9. puzzle popup (an old note in the dark)
+   ============================================================ */
 #modal{position:fixed;inset:0;z-index:50;background:#000d;display:grid;place-items:center;padding:12px;overflow:auto}
 .box{position:relative;width:min(100%,560px);max-height:100%;overflow:auto;background:linear-gradient(#170a0a,#0a0404);border:1px solid #5d0a0f;border-radius:2px;box-shadow:0 0 0 3px #000,0 0 40px #8f0e1488,inset 0 0 70px #000;padding:20px 18px}
 .box h2{margin-right:48px}
@@ -83,45 +168,69 @@ body.edit .spot{cursor:grab;outline:2px dashed var(--ghost)}
 #pHint{color:var(--dim);margin-top:0;font-style:italic}
 #msg{min-height:1.6em;color:var(--candle)}
 
-/* ===== puzzle: candle sequence ===== */
-.candles{display:grid;grid-template-columns:repeat(4,minmax(0,110px));gap:10px;justify-content:center}
+
+/* ============================================================
+   10. puzzles
+   ============================================================ */
+
+/* --- candle sequence (4, 5 or 6 candles) --- */
+.candles{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,96px));gap:10px;justify-content:center}
 .candle{--c:#e8b04a;aspect-ratio:1;background:#0c0505;border:1px solid #5d0a0f;border-radius:4px;position:relative;cursor:pointer}
-.candle.c1{--c:#d9453b}.candle.c2{--c:#7fe3c0}.candle.c3{--c:#b58ad6}
+.candle.c1{--c:#d9453b} .candle.c2{--c:#7fe3c0} .candle.c3{--c:#b58ad6} .candle.c4{--c:#e8863a} .candle.c5{--c:#6aa7e8}
 .candle span{position:absolute;left:50%;top:28%;width:22px;height:34px;margin-left:-11px;border-radius:50% 50% 50% 50%/62% 62% 38% 38%;background:var(--c);opacity:.15;transition:.12s}
-.candle.lit{border-color:var(--c)}.candle.lit span{opacity:1;box-shadow:0 0 34px 12px var(--c)}
+.candle.lit{border-color:var(--c)}
+.candle.lit span{opacity:1;box-shadow:0 0 34px 12px var(--c)}
 
-/* ===== puzzle: memory match ===== */
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:8px;max-width:440px;margin:0 auto}
-.card{aspect-ratio:1;font:inherit;font-size:1.7rem;background:#0c0505;border:1px solid #5d0a0f;border-radius:3px;cursor:pointer;color:var(--bone)}
-.card b{font-weight:400;visibility:hidden}.card:not(.up)::after{content:'☠';color:#5d0a0f}
-.card.up{background:#2a0a0c}.card.up b{visibility:visible}
+/* --- memory match (more cards in every room) --- */
+.cards{display:grid;grid-template-columns:repeat(var(--cols,3),1fr);gap:8px;max-width:440px;margin:0 auto}
+.card{aspect-ratio:1;font:inherit;font-family:'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif;font-size:1.7rem;background:#0c0505;border:1px solid #5d0a0f;border-radius:3px;cursor:pointer;color:var(--bone)}
+.card b{font-weight:400;visibility:hidden}
+.card:not(.up)::after{content:'☠';color:#5d0a0f}
+.card.up{background:#2a0a0c}
+.card.up b{visibility:visible}
 
-/* ===== puzzle: riddle ===== */
+/* --- riddle --- */
 .riddle{font-size:1.2rem;font-style:italic;margin:.5em 0 1em;color:#e6dcc3}
 
-/* ===== puzzle: number lock ===== */
-.notes{padding-left:1.1em}.notes li{margin:.3em 0}.notes li::marker{color:var(--bloodhi)}
-.lock{display:flex;gap:10px;margin:1em 0}
-.dig{width:58px;height:72px;font:inherit;font-size:2rem;background:#000;color:var(--bloodhi);border:1px solid #8f0e14;border-radius:3px;cursor:pointer;text-shadow:0 0 10px #d01a22}
+/* --- number lock (tap the arrows to change each digit) --- */
+.notes{padding-left:1.1em}
+.notes li{margin:.3em 0}
+.notes li::marker{color:var(--bloodhi)}
+.lock{display:flex;gap:12px;justify-content:center;margin:1em 0}
+.wheel{display:flex;flex-direction:column;align-items:center;gap:6px}
+.wheel button{width:58px;height:34px;font:inherit;background:#1a0708;color:var(--bone);border:1px solid #5d0a0f;border-radius:3px;cursor:pointer}
+.wheel button:hover{background:#4a0509}
+.wheel output{width:58px;height:70px;display:grid;place-items:center;font-size:2.2rem;color:var(--bloodhi);background:#000;border:1px solid var(--blood);border-radius:3px;text-shadow:0 0 10px var(--bloodhi)}
 
-/* ===== jumpscare (your picture, or the drawn face if the picture is missing) ===== */
+
+/* ============================================================
+   11. jumpscare (your picture, or the drawn face as a backup)
+   ============================================================ */
 #scare{position:fixed;inset:0;background:#000;display:none;place-items:center;z-index:99;overflow:hidden}
-#scare.on{display:grid;animation:redflash .12s steps(2) 14}
-#scare img{display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:scarezoom 1.8s ease-in forwards}
+#scare.on{display:grid;animation:redflash .12s steps(2) 18}
+#scare img{display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:scarezoom 2.2s ease-in forwards}
 #scare.pic img{display:block}
 #scare.pic .face{display:none}
-.face{position:relative;width:min(70vw,60vh);aspect-ratio:3/4;background:radial-gradient(#d8d0bc,#8d8574);border-radius:48% 48% 40% 40%;animation:zoom 1.7s ease-in forwards}
+
+.face{position:relative;width:min(70vw,60vh);aspect-ratio:3/4;background:radial-gradient(#d8d0bc,#8d8574);border-radius:48% 48% 40% 40%;animation:zoom 2.2s ease-in forwards}
 .eye{position:absolute;top:30%;width:26%;height:20%;background:#000;border-radius:50%}
 .eye::after{content:'';position:absolute;inset:35%;background:#ff2a2a;border-radius:50%;box-shadow:0 0 30px 12px #f00}
-.eye.l{left:14%}.eye.r{right:14%}
+.eye.l{left:14%}
+.eye.r{right:14%}
 .mouth{position:absolute;left:25%;right:25%;bottom:12%;height:28%;background:#000;clip-path:polygon(0 0,10% 60%,20% 10%,30% 80%,40% 15%,50% 100%,60% 15%,70% 80%,80% 10%,90% 60%,100% 0,90% 100%,10% 100%)}
 
-/* ===== static / creepy filter (grain, scanlines, dark edges, rolling line) ===== */
+
+/* ============================================================
+   12. static filter (grain, scanlines, dark edges, rolling line)
+   ============================================================ */
 #static{position:fixed;inset:0;z-index:40;pointer-events:none;overflow:hidden;animation:flick 6s infinite;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.6) 100%),repeating-linear-gradient(0deg,rgba(0,0,0,.2) 0 1px,transparent 1px 3px)}
-#static::before{content:'';position:absolute;inset:-50%;opacity:.12;animation:grain .5s steps(1) infinite;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+#static::before{content:'';position:absolute;inset:-50%;opacity:.12;animation:grain .5s steps(1) infinite;background:var(--noise)}
 #static::after{content:'';position:absolute;left:0;right:0;height:14vh;background:linear-gradient(transparent,rgba(255,255,255,.06),transparent);animation:roll 7s linear infinite}
 
-/* ===== animations ===== */
+
+/* ============================================================
+   13. animations and small screens
+   ============================================================ */
 @keyframes flicker{0%,100%{opacity:1}46%{opacity:1}48%{opacity:.5}50%{opacity:1}53%{opacity:.7}55%{opacity:1}}
 @keyframes tremble{0%,100%{transform:translate(0)}92%{transform:translate(0)}94%{transform:translate(-2px,1px)}96%{transform:translate(2px,-1px)}98%{transform:translate(-1px,0)}}
 @keyframes glow{0%,100%{filter:drop-shadow(0 0 4px var(--ghost)) drop-shadow(0 0 10px rgba(159,227,192,.6))}50%{filter:drop-shadow(0 0 8px #d8fff0) drop-shadow(0 0 24px var(--ghost))}}
@@ -132,10 +241,15 @@ body.edit .spot{cursor:grab;outline:2px dashed var(--ghost)}
 @keyframes redflash{50%{background:#5a0000}}
 @keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-5%,3%)}40%{transform:translate(4%,-6%)}60%{transform:translate(-3%,-4%)}80%{transform:translate(6%,5%)}}
 @keyframes roll{from{transform:translateY(-20vh)}to{transform:translateY(120vh)}}
+@keyframes blink{50%{opacity:0}}
+@keyframes burst{0%{opacity:1}100%{opacity:0}}
+@keyframes camjit{0%,90%,100%{transform:none}91%{transform:translate(3px,-1px) skewX(.6deg)}93%{transform:translate(-4px,1px)}95%{transform:none}}
 @keyframes flick{0%,92%,100%{opacity:1}93%{opacity:.55}95%{opacity:1}97%{opacity:.75}}
 
-/* ===== phones and tablets ===== */
-@media (max-width:520px){#hud .opt{display:none}#hud{gap:6px 12px;font-size:.7rem}}
+/* phones and tablets */
+@media (max-width:520px){#hud .opt{display:none} #hud{gap:6px 12px;font-size:.7rem}}
 @media (orientation:portrait) and (max-width:700px){#tip{display:block}}
-@media (max-height:420px){.box{padding:12px}h2{font-size:1.5rem}}
-@media (prefers-reduced-motion:reduce){h1,#game.hit,body.danger::after,body.danger #timeText,.spot img,#static,#static::before,#static::after{animation:none}}
+@media (max-height:420px){.box{padding:12px} h2{font-size:1.5rem}}
+
+/* people who prefer no motion */
+@media (prefers-reduced-motion:reduce){h1,#game.hit,body.danger::after,body.danger #timeText,.spot img,#stage,#cctv .rec i,#stage.switch .burst,#static,#static::before,#static::after{animation:none}}
