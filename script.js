@@ -1,4 +1,4 @@
-/* ============================================================
+/* 
    la casa matusita - script.js
    escape the haunted house: solve 3 puzzles in every room
    before the timer runs out
@@ -10,12 +10,12 @@
     5. sound                   12. puzzles (candles, cards, riddle, lock)
     6. game state              13. layout editor (?edit)
     7. room scene              14. effects and buttons
-   ============================================================ */
+    */
 
 
-/* ============================================================
+/* 
    1. settings (change file names and game rules here)
-   ============================================================ */
+    */
 
 /* files and folders (next to index.html) */
 const DIR_ROOMS     = 'rooms/';
@@ -50,7 +50,7 @@ const EDIT = location.search.includes('edit');
 const KEY_HIGH = 'matusita_high', KEY_BOARD = 'matusita_board', KEY_EDIT = 'matusita_edit';
 
 
-/* ============================================================
+/* 
    2. rooms and objects
    ------------------------------------------------------------
    room picture   = rooms/<file>.jpg
@@ -58,7 +58,7 @@ const KEY_HIGH = 'matusita_high', KEY_BOARD = 'matusita_board', KEY_EDIT = 'matu
    puzzle         = sequence | match | riddle | code
    x, y           = place on the room picture (percent)
    s              = size of the object (percent of picture width)
-   ============================================================ */
+    */
 const ROOMS = [
   { name: 'Foyer', hue: 0, file: 'foyer', spots: [
     { icon: '🕯️', name: 'Candelabra',        x: 52, y: 88, s: 6,   puzzle: 'sequence' },   // on the floor
@@ -102,9 +102,9 @@ const LAYOUT = {
 };
 
 
-/* ============================================================
+/* 
    3. helpers
-   ============================================================ */
+    */
 const $ = s => document.querySelector(s);
 const stage = $('#stage');
 const spots = $('#spots');
@@ -135,9 +135,9 @@ function unique(kind, make) {
 }
 
 
-/* ============================================================
+/* 
    4. saved data (localStorage)
-   ============================================================ */
+    */
 const store = {
   get(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } },
   set(key, value)    { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
@@ -148,9 +148,9 @@ let pos = { ...LAYOUT, ...(EDIT ? store.get(KEY_EDIT, {}) : {}) };
 const where = p => pos[p.name] || [p.x, p.y, p.s];
 
 
-/* ============================================================
+/* 
    5. sound
-   ============================================================ */
+    */
 let muted = false, ctx = null;
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 
@@ -205,9 +205,9 @@ function screech() {
 }
 
 
-/* ============================================================
+/* 
    6. game state
-   ============================================================ */
+    */
 let S = {}, tick = null, lastSec = -1;
 
 function newGame() {
@@ -248,9 +248,9 @@ function startRoom() {
 }
 
 
-/* ============================================================
+/* 
    7. room scene (picture, fisheye lens, glowing objects)
-   ============================================================ */
+    */
 const fishCache = new Map();       // room file -> curved picture (made once per room)
 const fishOn    = {};              // room file -> true when its picture is curved
 
@@ -442,9 +442,9 @@ function updateCamera() {
 }
 
 
-/* ============================================================
+/* 
    8. timer
-   ============================================================ */
+    */
 function loop() {
   if (S.paused || S.done) return;
 
@@ -462,9 +462,9 @@ function loop() {
 }
 
 
-/* ============================================================
+/* 
    9. scoring and room progress
-   ============================================================ */
+    */
 
 /* wrong answer: lose time and shake the screen */
 function penalty() {
@@ -503,9 +503,9 @@ function roomCleared() {
 }
 
 
-/* ============================================================
+/* 
    10. game over and scoreboard
-   ============================================================ */
+    */
 
 /* time ran out: jumpscare, then the game over screen */
 function lose() {
@@ -564,9 +564,9 @@ function saveScore() {
 }
 
 
-/* ============================================================
+/* 
    11. puzzle popup
-   ============================================================ */
+    */
 function openSpot(i) {
   if (EDIT || S.busy || S.done || S.solved[i]) return;
   S.cur = i;
@@ -584,11 +584,11 @@ function closeModal() {
 }
 
 
-/* ============================================================
+/* 
    12. puzzles
    every puzzle gets harder with the room number,
    and nothing repeats inside one game
-   ============================================================ */
+    */
 
 /* --- riddles: 5 easy (rooms 1-2), 6 medium (rooms 3-5), 5 hard (rooms 6-7) --- */
 const RIDDLES = [
@@ -789,10 +789,10 @@ const PUZ = {
 };
 
 
-/* ============================================================
+/* 
    13. layout editor (open index.html?edit)
    drag = move an object, mouse wheel = resize it
-   ============================================================ */
+    */
 function showLayout() {
   $('#eRoom').textContent = `Room ${S.room}: ${ROOMS[S.room - 1].name}`;
   $('#eOut').value = ROOMS.flatMap(r => r.spots).map(p => {
@@ -846,9 +846,9 @@ if (EDIT) {
 }
 
 
-/* ============================================================
+/* 
    14. effects and buttons
-   ============================================================ */
+    */
 
 /* --- fullscreen --- */
 function goFull() {
