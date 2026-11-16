@@ -1,5 +1,5 @@
 /* 
-   la casa matusita - script.js
+   la casa matusita
    escape the haunted house: solve 3 puzzles in every room
    before the timer runs out
    ------------------------------------------------------------
