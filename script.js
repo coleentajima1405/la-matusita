@@ -1,29 +1,35 @@
-/* 
-   la casa matusita
+/* ============================================================
+   la casa matusita - script.js
    escape the haunted house: solve 3 puzzles in every room
    before the timer runs out
    ------------------------------------------------------------
-    1. settings                 8. timer
-    2. rooms and objects        9. scoring and room progress
-    3. helpers                 10. game over and scoreboard
-    4. saved data              11. puzzle popup
-    5. sound                   12. puzzles (candles, cards, riddle, lock)
-    6. game state              13. layout editor (?edit)
-    7. room scene              14. effects and buttons
-    */
+    1. settings                  9. hallway (walk to the next room)
+    2. rooms and objects        10. scoring and room progress
+    3. helpers                  11. game over and scoreboard
+    4. saved data               12. puzzle popup
+    5. sound                    13. puzzles (candles, cards, riddle, lock)
+    6. game state               14. layout editor (?edit)
+    7. room scene (fisheye)     15. effects and buttons
+    8. timer
+   ============================================================ */
 
 
-/* 
+/* ============================================================
    1. settings (change file names and game rules here)
-    */
+   ============================================================ */
 
-/* files and folders (next to index.html) */
+/* folders (next to index.html) - names must match your folders exactly */
 const DIR_ROOMS     = 'rooms/';
 const DIR_OBJECTS   = 'objects/';
-const MUSIC_FILE    = 'music files/bg-music.mp3';
-const CLICK_FILE    = 'music files/click-sound.mp3';
-const JUMPSCARE_IMG = 'jumpscare-face.jpg';
-const JUMPSCARE_SND = 'music files/jumpscare-sound.mp3';
+const DIR_MUSIC     = 'music files/';
+const DIR_SCARES    = 'jumpscare pictures/';
+
+/* files inside those folders */
+const MUSIC_FILE    = encodeURI(DIR_MUSIC + 'bg-music.mp3');
+const CLICK_FILE    = encodeURI(DIR_MUSIC + 'click-sound.mp3');
+const JUMPSCARE_SND = encodeURI(DIR_MUSIC + 'jumpscare-sound.mp3');
+const JUMPSCARE_IMG = encodeURI(DIR_SCARES + 'jumpscare-face.jpg');          // when the timer runs out
+const JUMPSCARE_ROOM = DIR_SCARES + 'jumpscare-room-';                         // + room number + .jpg (hallway scares)
 
 /* game rules */
 const TOTAL_ROOMS = 7;
@@ -33,6 +39,13 @@ const TIME_MIN    = 60;       // never less than this
 const PENALTY     = 5;        // seconds lost for a wrong answer
 const TIME_BONUS  = 5;        // points for every second left
 const JUMPSCARE_MS = 2200;    // how long the jumpscare lasts
+/* hallway between the rooms */
+const HALLWAY        = true;    // false = go straight from room to room
+const HALL_MIN_CLICKS = 3;     // fewest clicks between two doors
+const HALL_MAX_CLICKS = 4;     // most clicks between two doors
+const HALL_STEP      = 1.6;    // how far one click walks
+const HALL_ARRIVE    = 2.5;    // how far before the door you stop
+const HALL_WALK_MS   = 850;    // how long one step takes
 const POINTS = { sequence: 500, match: 500, riddle: 400, code: 600 };
 
 /* look and feel (true / false) */
@@ -50,7 +63,7 @@ const EDIT = location.search.includes('edit');
 const KEY_HIGH = 'matusita_high', KEY_BOARD = 'matusita_board', KEY_EDIT = 'matusita_edit';
 
 
-/* 
+/* ============================================================
    2. rooms and objects
    ------------------------------------------------------------
    room picture   = rooms/<file>.jpg
@@ -58,7 +71,7 @@ const KEY_HIGH = 'matusita_high', KEY_BOARD = 'matusita_board', KEY_EDIT = 'matu
    puzzle         = sequence | match | riddle | code
    x, y           = place on the room picture (percent)
    s              = size of the object (percent of picture width)
-    */
+   ============================================================ */
 const ROOMS = [
   { name: 'Foyer', hue: 0, file: 'foyer', spots: [
     { icon: '🕯️', name: 'Candelabra',        x: 52, y: 88, s: 6,   puzzle: 'sequence' },   // on the floor
@@ -102,9 +115,9 @@ const LAYOUT = {
 };
 
 
-/* 
+/* ============================================================
    3. helpers
-    */
+   ============================================================ */
 const $ = s => document.querySelector(s);
 const stage = $('#stage');
 const spots = $('#spots');
@@ -135,9 +148,9 @@ function unique(kind, make) {
 }
 
 
-/* 
+/* ============================================================
    4. saved data (localStorage)
-    */
+   ============================================================ */
 const store = {
   get(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } },
   set(key, value)    { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
@@ -148,9 +161,9 @@ let pos = { ...LAYOUT, ...(EDIT ? store.get(KEY_EDIT, {}) : {}) };
 const where = p => pos[p.name] || [p.x, p.y, p.s];
 
 
-/* 
+/* ============================================================
    5. sound
-    */
+   ============================================================ */
 let muted = false, ctx = null;
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 
@@ -205,9 +218,9 @@ function screech() {
 }
 
 
-/* 
+/* ============================================================
    6. game state
-    */
+   ============================================================ */
 let S = {}, tick = null, lastSec = -1;
 
 function newGame() {
@@ -221,8 +234,9 @@ function newGame() {
     used: { riddle: new Set(), code: new Set(), seq: new Set() }      // remembers puzzles already shown
   };
   $('#hBest').textContent = store.get(KEY_HIGH, 0);
-  show('game');
-  startRoom();
+  S.hall = hallPlan();
+  if (HALLWAY && !EDIT) enterHall();          // walk the hallway first
+  else { show('game'); startRoom(); }
 }
 
 function startRoom() {
@@ -248,9 +262,9 @@ function startRoom() {
 }
 
 
-/* 
+/* ============================================================
    7. room scene (picture, fisheye lens, glowing objects)
-    */
+   ============================================================ */
 const fishCache = new Map();       // room file -> curved picture (made once per room)
 const fishOn    = {};              // room file -> true when its picture is curved
 
@@ -442,9 +456,9 @@ function updateCamera() {
 }
 
 
-/* 
+/* ============================================================
    8. timer
-    */
+   ============================================================ */
 function loop() {
   if (S.paused || S.done) return;
 
@@ -462,9 +476,279 @@ function loop() {
 }
 
 
-/* 
-   9. scoring and room progress
-    */
+/* ============================================================
+   9. hallway (one long dark hallway with the 7 doors in order)
+   walk forward by tapping, 3-4 taps between doors,
+   one jumpscare on the way to every room
+   ============================================================ */
+const hallCanvas = $('#hallCanvas'), hg = hallCanvas.getContext('2d');
+let H = null;                                       // hallway state, made again for every walk (see enterHall)
+
+/* --- the 7 jumpscares: picture jumpscare-room-N.jpg, a different effect for every room --- */
+const HALL_SCARES = [
+  { type: 'flash',  ms: 320  },    // room 1: one quick white flash
+  { type: 'strobe', ms: 1000 },    // room 2: shows up, vanishes, shows up again
+  { type: 'lights', ms: 1500 },    // room 3: the lights die, then it appears
+  { type: 'rush',   ms: 1300 },    // room 4: runs at you from the end of the hallway
+  { type: 'glitch', ms: 1100 },    // room 5: broken camera glitch
+  { type: 'peek',   ms: 900  },    // room 6: slides in from the side and leaves
+  { type: 'long',   ms: 2000 }     // room 7: the big one
+];
+
+const jumpscareFile = n => encodeURI(`${JUMPSCARE_ROOM}${n}.jpg`);
+const hallPics = {};                                // room number -> true when its picture loaded
+for (let n = 1; n <= TOTAL_ROOMS; n++) {
+  const im = new Image();
+  im.onload = () => { hallPics[n] = true; };
+  im.src = jumpscareFile(n);
+}
+
+/* --- the plan: how many clicks between doors, and where every door is --- */
+function hallPlan() {
+  const clicks = [], stops = [];
+  let z = 0;
+  for (let k = 0; k < TOTAL_ROOMS; k++) {
+    const c = rnd(HALL_MIN_CLICKS, HALL_MAX_CLICKS);        // 3 or 4 clicks to the next door
+    z += c * HALL_STEP;
+    clicks.push(c);
+    stops.push(z);                                          // where you stand in front of door k
+  }
+  return { clicks, stops };
+}
+
+/* --- start walking toward the door of the current room --- */
+function enterHall() {
+  const k = S.room - 1;
+  clearInterval(tick);
+  document.body.classList.remove('danger');
+  H = {
+    alive: true, k,
+    clicks: S.hall.clicks[k], step: 0,
+    cam: k ? S.hall.stops[k - 1] : 0,                       // you start where the last door was
+    moving: false, from: 0, to: 0, t0: 0, walkP: 0, foot: 0,
+    scareAt: rnd(1, S.hall.clicks[k]), scared: false, scaring: false, dark: false,
+    open: 0, opening: false, leaving: false
+  };
+  $('#hhud').innerHTML = `<span>Hallway</span><span>Next: room <b>${S.room}</b>/${TOTAL_ROOMS}</span><span>Score <b>${S.score}</b></span>`;
+  show('hall');
+  sizeHall();
+  hallHint();
+  requestAnimationFrame(hallFrame);
+}
+
+function sizeHall() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+  hallCanvas.width  = Math.max(2, Math.round(hallCanvas.clientWidth * dpr));
+  hallCanvas.height = Math.max(2, Math.round(hallCanvas.clientHeight * dpr));
+}
+
+function hallHint() {
+  let text = '';
+  if (H && !H.moving && !H.scaring && !H.opening) text = H.step < H.clicks ? 'Tap to walk forward' : 'Tap the glowing door';
+  $('#hhint').textContent = text;
+}
+
+/* --- one tap: walk one step, or open the door when you are at it --- */
+function hallTap() {
+  if (!H || !H.alive || H.moving || H.scaring || H.opening) return;
+  if (H.step < H.clicks) {
+    H.moving = true; H.from = H.cam; H.to = H.cam + HALL_STEP; H.t0 = performance.now(); H.foot = 0;
+  } else {
+    H.opening = true; H.o0 = performance.now(); H.camOpen = H.cam;
+    tone(150, .7, 'sawtooth', .05);                         // creaky door
+  }
+  hallHint();
+}
+
+/* --- called after every step: maybe the jumpscare happens now --- */
+function afterStep() {
+  if (H.step === H.scareAt && !H.scared) {
+    H.scared = true; H.scaring = true;
+    hallHint();
+    setTimeout(hallScare, rnd(350, 1100));                  // a moment of silence first
+  } else hallHint();
+}
+
+/* --- the jumpscare of this room (picture + effect) --- */
+function hallScare() {
+  if (!H || !H.alive) return;
+  const n = S.room, cfg = HALL_SCARES[n - 1], hs = $('#hscare');
+  const pic = !!hallPics[n];
+  $('#hscareImg').src = pic ? jumpscareFile(n) : '';
+  const showIt = () => { hs.className = 'on ' + cfg.type + (pic ? ' pic' : ''); };
+
+  playJumpscare();
+  if (cfg.type === 'lights') {                              // lights out first, then it appears
+    H.dark = true; tone(45, .9, 'sawtooth', .18);
+    setTimeout(() => { H.dark = false; showIt(); }, 1000);
+  } else showIt();
+
+  setTimeout(() => {
+    hs.className = ''; jumpSnd.pause();
+    if (H) { H.dark = false; H.scaring = false; hallHint(); }
+  }, cfg.ms);
+}
+
+/* --- every frame: move the camera, then draw --- */
+const ease = p => p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+
+function hallFrame(now) {
+  if (!H || !H.alive) return;
+
+  if (H.moving) {                                           // walking one step
+    const p = Math.min(1, (now - H.t0) / HALL_WALK_MS);
+    H.walkP = p; H.cam = H.from + (H.to - H.from) * ease(p);
+    if (p > .22 && H.foot === 0) { H.foot = 1; tone(55, .14, 'sine', .3); }       // footsteps
+    if (p > .72 && H.foot === 1) { H.foot = 2; tone(50, .14, 'sine', .3); }
+    if (p >= 1) { H.moving = false; H.cam = H.to; H.step++; afterStep(); }
+  }
+
+  if (H.opening) {                                          // door swings open, then fade into the room
+    H.open = Math.min(1, (now - H.o0) / 900);
+    H.cam = H.camOpen + .7 * H.open;
+    if (H.open >= 1 && !H.leaving) {
+      H.leaving = true;
+      fadeTo(() => { H.alive = false; show('game'); startRoom(); });
+    }
+  }
+
+  drawHall(now / 1000);
+  requestAnimationFrame(hallFrame);
+}
+
+/* black fade, do something in the dark, fade back */
+function fadeTo(then) {
+  const f = $('#fade');
+  f.classList.add('on');
+  setTimeout(() => { then(); f.classList.remove('on'); }, 550);
+}
+
+/* --- drawing the hallway (simple 3d: floor, ceiling, walls, lamps, doors) --- */
+const LAMP_GAP = 5, LAMP_OFF = 2.5, HALL_FAR = 15, FRAME_GAP = 3.1;
+
+const rgb = (c, m) => { m = Math.max(0, Math.min(1.3, m)); return `rgb(${c[0] * m | 0},${c[1] * m | 0},${c[2] * m | 0})`; };
+
+/* some lamps flicker, all die during the lights-out scare */
+function lampFlick(k, t) {
+  if (H.dark) return 0;
+  return k % 3 === 1 && Math.sin(t * 41 + k * 3) * Math.sin(t * 13 + k) > .5 ? .2 : 1;
+}
+
+/* how bright it is at depth z: your flashlight near you + pools of light under the lamps */
+function lightAt(z, cam, t) {
+  let v = .04 + .42 * Math.max(0, 1 - (z - cam) / 7);          // darker = scarier (raise .42 to see more)
+  const k0 = Math.round((z - LAMP_OFF) / LAMP_GAP);
+  for (let k = k0 - 1; k <= k0 + 1; k++) {
+    const d = z - (LAMP_OFF + k * LAMP_GAP);
+    v += .55 * lampFlick(k, t) * Math.exp(-d * d / 1.6);
+  }
+  return H.dark ? v * .05 : v;
+}
+
+function drawHall(t) {
+  const w = hallCanvas.width, h = hallCanvas.height, cam = H.cam, p = H.moving ? H.walkP : 0;
+  const bob  = H.moving ? Math.sin(p * Math.PI * 4) * .03 : Math.sin(t * 1.4) * .006;     // walking bounce
+  const sway = H.moving ? Math.sin(p * Math.PI * 2) * .012 * w : 0;
+  const F = Math.min(w * .62, h * .95), eye = -.25 + bob, cx = w / 2 + sway, cy = h * .5, near = .12;
+  const end = S.hall.stops[TOTAL_ROOMS - 1] + HALL_ARRIVE + 8;
+
+  /* 3d point -> screen point */
+  const P = (x, y, z) => { const d = Math.max(z - cam, near); return [cx + x * F / d, cy - (y - eye) * F / d]; };
+  const path = pts => { hg.beginPath(); pts.forEach((q, i) => { const s = P(q[0], q[1], q[2]); i ? hg.lineTo(s[0], s[1]) : hg.moveTo(s[0], s[1]); }); hg.closePath(); };
+  const quad = (pts, color) => { path(pts); hg.fillStyle = color; hg.fill(); hg.strokeStyle = color; hg.lineWidth = 1; hg.stroke(); };
+  const wall = (x, za, zb, y0, y1, color) => quad([[x, y0, za], [x, y0, zb], [x, y1, zb], [x, y1, za]], color);
+  const shade = (c, L, d) => rgb(c, L * Math.max(0, 1 - Math.pow(d / HALL_FAR, 1.4)));
+
+  hg.fillStyle = '#000'; hg.fillRect(0, 0, w, h);
+
+  /* floor, ceiling and walls, far to near, in slices */
+  const dz = .35, first = Math.floor((cam + near) / dz), last = Math.min(Math.floor((cam + HALL_FAR) / dz), Math.floor(end / dz));
+  for (let i = last; i >= first; i--) {
+    const za = Math.max(i * dz, cam + near), zb = (i + 1) * dz + .02;
+    if (zb <= za) continue;
+    const zm = (za + zb) / 2, d = zm - cam, L = lightAt(zm, cam, t);
+
+    quad([[-1, -1, za], [1, -1, za], [1, -1, zb], [-1, -1, zb]], shade(i % 2 ? [52, 12, 14] : [60, 14, 16], L, d));      // carpet
+    quad([[-.5, -1, za], [.5, -1, za], [.5, -1, zb], [-.5, -1, zb]], shade(i % 2 ? [100, 14, 20] : [112, 16, 22], L, d)); // runner
+    quad([[-.56, -1, za], [-.5, -1, za], [-.5, -1, zb], [-.56, -1, zb]], shade([130, 98, 42], L, d));                    // gold trim
+    quad([[.5, -1, za], [.56, -1, za], [.56, -1, zb], [.5, -1, zb]], shade([130, 98, 42], L, d));
+    quad([[-1, 1, za], [1, 1, za], [1, 1, zb], [-1, 1, zb]], shade([34, 31, 28], L, d));                                 // ceiling
+
+    for (const x of [-1, 1]) {                                                                                           // both walls
+      wall(x, za, zb, -1, -.88, shade([20, 12, 8], L, d));                                                               //   baseboard
+      wall(x, za, zb, -.88, -.35, shade([46, 27, 17], L, d));                                                            //   wood panel
+      wall(x, za, zb, -.35, -.28, shade([96, 70, 40], L, d));                                                            //   rail
+      wall(x, za, zb, -.28, 1, shade(i % 4 === 0 ? [66, 52, 40] : [90, 74, 58], L, d));                                  //   wallpaper stripes
+    }
+  }
+
+  /* ceiling lamps with a glow */
+  const k0 = Math.ceil((cam + near - LAMP_OFF) / LAMP_GAP), k1 = Math.floor((Math.min(cam + HALL_FAR, end) - LAMP_OFF) / LAMP_GAP);
+  for (let k = k1; k >= k0; k--) {
+    const zl = LAMP_OFF + k * LAMP_GAP, d = zl - cam, fl = lampFlick(k, t);
+    quad([[-.22, 1, zl - .22], [.22, 1, zl - .22], [.22, 1, zl + .22], [-.22, 1, zl + .22]], rgb([255, 226, 160], fl * Math.max(0, 1 - d / HALL_FAR)));
+    const [lx, ly] = P(0, .98, zl), r = Math.min(1.1 / d * F, w);
+    const gr = hg.createRadialGradient(lx, ly, 0, lx, ly, r);
+    gr.addColorStop(0, `rgba(255,214,140,${.5 * fl})`); gr.addColorStop(1, 'rgba(255,214,140,0)');
+    hg.globalCompositeOperation = 'lighter'; hg.fillStyle = gr; hg.fillRect(lx - r, ly - r, r * 2, r * 2); hg.globalCompositeOperation = 'source-over';
+  }
+
+  /* the doors (one for every room, left and right in turn) */
+  const doors = S.hall.stops.map((s, k) => ({ k, z: s + HALL_ARRIVE, side: k % 2 ? 1 : -1 }));
+
+  /* old pictures on the walls (not where a door is) */
+  for (let z = Math.ceil((cam + near) / FRAME_GAP) * FRAME_GAP; z < Math.min(cam + HALL_FAR, end); z += FRAME_GAP) {
+    const side = Math.round(z / FRAME_GAP) % 2 ? -1 : 1, d = z - cam, L = lightAt(z, cam, t);
+    if (doors.some(o => o.side === side && Math.abs(o.z - z) < 1.3)) continue;
+    wall(side, z - .35, z + .35, -.05, .6, shade([34, 24, 14], L, d));
+    wall(side, z - .28, z + .28, .02, .53, shade([14, 16, 18], L * .8, d));
+  }
+
+  doors.filter(o => o.z + .7 > cam + near && o.z - cam < HALL_FAR).sort((a, b) => b.z - a.z).forEach(o => {
+    const x = o.side, d = o.z - cam, L = lightAt(o.z, cam, t), z0 = o.z - .5, z1 = o.z + .5;
+    const isNext = o.k === H.k, open = isNext ? H.open : 0;
+
+    wall(x, z0 - .1, z1 + .1, -1, .9, shade([28, 18, 12], L, d));                                   // frame
+    if (open > 0) wall(x, z0, z1, -1, .78, rgb([255, 200, 130], .45 * open));                       // light from inside
+    const lz = z0 + (z1 - z0) * (1 - .86 * open);                                                    // door swings open
+    wall(x, z0, lz, -1, .78, shade(o.k >= H.k ? [70, 40, 24] : [38, 30, 26], L, d));                // door
+    if (lz - z0 > .35) {
+      wall(x, z0 + .1, lz - .1, -.9, -.1, shade([50, 28, 16], L, d));                                // panels
+      wall(x, z0 + .1, lz - .1, .05, .68, shade([50, 28, 16], L, d));
+    }
+    const [kx, ky] = P(x, -.22, z0 + (lz - z0) * .88);                                               // door knob
+    hg.beginPath(); hg.arc(kx, ky, Math.max(1.5, .05 / d * F), 0, 7); hg.fillStyle = shade([210, 180, 100], L + .3, d); hg.fill();
+
+    wall(x, o.z - .14, o.z + .14, .6, .72, shade([190, 160, 90], L + .2, d));                         // number plate
+    const [tx, ty] = P(x, .66, o.z);
+    hg.fillStyle = '#2a1a08'; hg.font = `${Math.max(6, .075 / d * F)}px 'Special Elite', serif`; hg.textAlign = 'center'; hg.textBaseline = 'middle';
+    hg.fillText(o.k + 1, tx, ty);
+
+    /* the door you are walking to glows */
+    if (isNext && !open) {
+      const pulse = .6 + .4 * Math.sin(t * 3);
+      hg.save();
+      hg.shadowColor = '#9fe3c0'; hg.shadowBlur = (18 + 18 * pulse) * (w / 1000 + .4);
+      path([[x, -1, z0 - .1], [x, -1, z1 + .1], [x, .9, z1 + .1], [x, .9, z0 - .1]]);
+      hg.fillStyle = `rgba(159,227,192,${.03 + .04 * pulse})`; hg.fill();
+      hg.strokeStyle = `rgba(159,227,192,${.55 * pulse + .35})`; hg.lineWidth = 2.5; hg.stroke();
+      hg.restore();
+      hg.globalCompositeOperation = 'lighter';
+      wall(x, z0, z1, -1, -.94, 'rgb(159,227,192)');                                                // light under the door
+      hg.globalCompositeOperation = 'source-over';
+    }
+  });
+
+  /* dark edges */
+  const g = hg.createRadialGradient(w / 2, h / 2, Math.min(w, h) * .2, w / 2, h / 2, Math.max(w, h) * .72);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.88)');
+  hg.fillStyle = g; hg.fillRect(0, 0, w, h);
+}
+
+
+/* ============================================================
+   10. scoring and room progress
+   ============================================================ */
 
 /* wrong answer: lose time and shake the screen */
 function penalty() {
@@ -498,18 +782,23 @@ function roomCleared() {
   tone(300, .4, 'triangle', .12);
   setTimeout(() => {
     if (S.room >= TOTAL_ROOMS) end(true);      // last room done: you win
-    else { S.room++; startRoom(); }
+    else {
+      S.room++;
+      if (HALLWAY && !EDIT) fadeTo(enterHall);   // back to the hallway
+      else startRoom();
+    }
   }, 1400);
 }
 
 
-/* 
-   10. game over and scoreboard
-    */
+/* ============================================================
+   11. game over and scoreboard
+   ============================================================ */
 
 /* time ran out: jumpscare, then the game over screen */
 function lose() {
   S.done = true;
+  if (H) H.alive = false;
   clearInterval(tick);
   document.body.classList.remove('danger');
   closeModal();
@@ -526,6 +815,7 @@ function lose() {
 
 function end(won) {
   S.done = true;
+  if (H) H.alive = false;
   clearInterval(tick);
   document.body.classList.remove('danger');
   document.body.style.setProperty('--h', 18);
@@ -564,9 +854,9 @@ function saveScore() {
 }
 
 
-/* 
-   11. puzzle popup
-    */
+/* ============================================================
+   12. puzzle popup
+   ============================================================ */
 function openSpot(i) {
   if (EDIT || S.busy || S.done || S.solved[i]) return;
   S.cur = i;
@@ -584,11 +874,11 @@ function closeModal() {
 }
 
 
-/* 
-   12. puzzles
+/* ============================================================
+   13. puzzles
    every puzzle gets harder with the room number,
    and nothing repeats inside one game
-    */
+   ============================================================ */
 
 /* --- riddles: 5 easy (rooms 1-2), 6 medium (rooms 3-5), 5 hard (rooms 6-7) --- */
 const RIDDLES = [
@@ -789,10 +1079,10 @@ const PUZ = {
 };
 
 
-/* 
-   13. layout editor (open index.html?edit)
+/* ============================================================
+   14. layout editor (open index.html?edit)
    drag = move an object, mouse wheel = resize it
-    */
+   ============================================================ */
 function showLayout() {
   $('#eRoom').textContent = `Room ${S.room}: ${ROOMS[S.room - 1].name}`;
   $('#eOut').value = ROOMS.flatMap(r => r.spots).map(p => {
@@ -846,9 +1136,9 @@ if (EDIT) {
 }
 
 
-/* 
-   14. effects and buttons
-    */
+/* ============================================================
+   15. effects and buttons
+   ============================================================ */
 
 /* --- fullscreen --- */
 function goFull() {
@@ -876,6 +1166,13 @@ $('#cctv').hidden = !CCTV;
 
 /* --- static filter on / off --- */
 $('#static').hidden = !STATIC_FX;
+
+/* --- hallway: tap / click / keys to walk, resize --- */
+hallCanvas.addEventListener('pointerdown', hallTap);
+window.addEventListener('resize', () => { if (H && H.alive) sizeHall(); });
+document.addEventListener('keydown', e => {
+  if (['ArrowUp', 'w', 'W', ' ', 'Enter'].includes(e.key) && $('#hall').classList.contains('active')) { e.preventDefault(); hallTap(); }
+});
 
 /* --- buttons --- */
 $('#bestStart').textContent = store.get(KEY_HIGH, 0);

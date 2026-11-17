@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 
-<!-- 
-     la casa matusita 
+<!-- ============================================================
+     la casa matusita - index.html
      the page structure: start, how to play, game, game over
-      -->
+     ============================================================ -->
 
 <head>
   <meta charset="UTF-8">
@@ -53,6 +53,7 @@
       <ul class="rules">
         <li>The house has 7 rooms. Each room has 3 glowing objects and one countdown.</li>
         <li>Tap a glowing object to open its puzzle. Solve all 3 before time runs out to unlock the next room.</li>
+        <li>Between rooms you walk down one long dark hallway. Tap to walk forward, and tap the glowing door to go in. Something is waiting in there.</li>
         <li>Every room is harder: less time and trickier puzzles. No puzzle repeats.</li>
         <li>Each puzzle gives points (400 to 600) plus 5 points for every second left.</li>
         <li>A wrong answer costs 5 seconds. If time hits zero, the house gets you.</li>
@@ -119,6 +120,14 @@
   </section>
 
 
+  <!-- ============ screen: the hallway between rooms ============ -->
+  <section id="hall" class="screen">
+    <canvas id="hallCanvas"></canvas>
+    <header id="hhud"></header>
+    <p id="hhint" aria-live="polite"></p>
+  </section>
+
+
   <!-- ============ screen 4: game over ============ -->
   <section id="over" class="screen menu">
     <div class="in">
@@ -142,6 +151,17 @@
     </div>
   </section>
 
+
+  <!-- hallway jumpscare (your jumpscare-room-N picture, or a drawn face as a backup) -->
+  <div id="hscare" aria-hidden="true">
+    <div class="shot">
+      <img id="hscareImg" alt="">
+      <div class="face"><span class="eye l"></span><span class="eye r"></span><span class="mouth"></span></div>
+    </div>
+  </div>
+
+  <!-- black fade between hallway and rooms -->
+  <div id="fade"></div>
 
   <!-- jumpscare overlay (picture + drawn face as a backup) -->
   <div id="scare" aria-hidden="true">
