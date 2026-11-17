@@ -39,6 +39,17 @@ const TIME_MIN    = 60;       // never less than this
 const PENALTY     = 5;        // seconds lost for a wrong answer
 const TIME_BONUS  = 5;        // points for every second left
 const JUMPSCARE_MS = 2200;    // how long the jumpscare lasts
+
+/* sanity system */
+const SANITY_MAX = 100;
+const SANITY_WRONG_LOSS = 7;       // wrong answers and hints
+const SANITY_HALL_LOSS = 7;        // hallway jumpscares
+const SANITY_HAUNT_LOSS = 5;       // random ghost encounter inside a room
+const SANITY_ROOM_RECOVERY = 10;  // regain sanity after clearing a room
+const SANITY_WARY = 75;
+const SANITY_UNSETTLED = 50;
+const SANITY_CRITICAL = 25;
+
 /* hallway between the rooms */
 const HALLWAY        = true;    // false = go straight from room to room
 const HALL_MIN_CLICKS = 3;     // fewest clicks between two doors
@@ -229,10 +240,17 @@ function newGame() {
   S = {
     room: 1, score: 0,
     time: 0, max: 0,
+    sanity: SANITY_MAX,
+    elapsed: 0, hauntAt: 0, haunted: false, nextGlitchAt: 0,
     paused: EDIT, busy: false, done: false,
     solved: [], cur: 0,
     used: { riddle: new Set(), code: new Set(), seq: new Set() }      // remembers puzzles already shown
   };
+  clearInterval(tick);
+  document.body.classList.remove('sanity-wary', 'sanity-unsettled', 'sanity-critical');
+  $('#stage').classList.remove('sanity-glitch');
+  $('#sanityNotice').classList.remove('show');
+  updateSanityUI();
   $('#hBest').textContent = store.get(KEY_HIGH, 0);
   S.hall = hallPlan();
   if (HALLWAY && !EDIT) enterHall();          // walk the hallway first
@@ -245,6 +263,13 @@ function startRoom() {
   S.time   = S.max;
   S.busy   = false;
   S.solved = [false, false, false];
+   S.elapsed = 0;
+  S.haunted = false;
+  S.hauntAt = rnd(16, Math.max(22, Math.floor(S.max * .65)));
+  S.nextGlitchAt = rnd(8, 12);
+  lastSec = -1;
+  updateSanityUI();
+
 
   document.body.style.setProperty('--h', R.hue);
   $('#hRoom').textContent  = S.room;
@@ -455,9 +480,91 @@ function updateCamera() {
   $('#camTime').textContent = `${HOURS[S.room - 1]}:${String(minutes).padStart(2, '0')} AM`;
 }
 
+/* ============================================================
+   8. sanity system
+   ============================================================ */
+let sanityNoticeTimer = null;
+
+function updateSanityUI() {
+  if (!S || typeof S.sanity !== 'number') return;
+
+  const value = Math.max(0, Math.min(SANITY_MAX, S.sanity));
+  const percent = Math.ceil(value);
+  const fill = $('#sanityFill');
+  const text = $('#sanityText');
+  const hud = $('#sanityHud');
+
+  if (fill) fill.style.width = percent + '%';
+  if (text) text.textContent = percent + '%';
+  if (hud) hud.setAttribute('aria-label', `Sanity: ${percent}%`);
+
+  document.body.classList.toggle('sanity-wary', value <= SANITY_WARY && value > SANITY_UNSETTLED);
+  document.body.classList.toggle('sanity-unsettled', value <= SANITY_UNSETTLED && value > SANITY_CRITICAL);
+  document.body.classList.toggle('sanity-critical', value <= SANITY_CRITICAL);
+
+  const hallSanity = $('#hallSanity');
+  if (hallSanity) hallSanity.textContent = percent + '%';
+}
+
+function showSanityNotice(message) {
+  const notice = $('#sanityNotice');
+  if (!notice || !message) return;
+
+  notice.textContent = message;
+  notice.classList.add('show');
+  clearTimeout(sanityNoticeTimer);
+  sanityNoticeTimer = setTimeout(() => notice.classList.remove('show'), 2600);
+}
+
+/* Returns false when sanity reaches zero and the game ends. */
+function changeSanity(amount, message = '') {
+  if (!S || S.done || typeof S.sanity !== 'number') return false;
+
+  const before = S.sanity;
+  S.sanity = Math.max(0, Math.min(SANITY_MAX, S.sanity + amount));
+  updateSanityUI();
+
+  if (message && amount < 0) showSanityNotice(message);
+  if (message && amount > 0) showSanityNotice(message);
+
+  if (amount < 0 && S.sanity < before) {
+    tone(S.sanity <= SANITY_CRITICAL ? 58 : 85, .22, 'sine', .13);
+  }
+
+  if (S.sanity <= 0) {
+    lose('sanity');
+    return false;
+  }
+  return true;
+}
+
+/* A short CCTV distortion that grows more frequent at low sanity. */
+function triggerCameraGlitch() {
+  if (S.done || !$('#game').classList.contains('active')) return;
+
+  const target = $('#stage');
+  target.classList.remove('sanity-glitch');
+  void target.offsetWidth;
+  target.classList.add('sanity-glitch');
+  setTimeout(() => target.classList.remove('sanity-glitch'), 520);
+}
+
+/* One ghost encounter per room. It damages sanity but does not directly end the run. */
+function triggerRoomHaunting() {
+  if (S.done || S.haunted || EDIT) return;
+  S.haunted = true;
+
+  triggerCameraGlitch();
+  tone(48, .8, 'sawtooth', .1);
+  if (!changeSanity(-SANITY_HAUNT_LOSS, 'A shadow moves behind you. Your sanity weakens.')) return;
+
+  document.body.classList.add('haunted');
+  setTimeout(() => document.body.classList.remove('haunted'), 850);
+}
+
 
 /* ============================================================
-   8. timer
+   9. timer
    ============================================================ */
 function loop() {
   if (S.paused || S.done) return;
@@ -466,6 +573,15 @@ function loop() {
   $('#barFill').style.width  = (S.time / S.max * 100) + '%';
   $('#timeText').textContent = Math.ceil(S.time) + 's';
   updateCamera();
+
+    // A single unsettling encounter happens at a random point in each room.
+  if (!S.haunted && S.elapsed >= S.hauntAt) triggerRoomHaunting();
+
+  // The lower the sanity, the more often the CCTV briefly glitches.
+  if (S.sanity <= SANITY_UNSETTLED && S.elapsed >= S.nextGlitchAt) {
+    triggerCameraGlitch();
+    S.nextGlitchAt = S.elapsed + (S.sanity <= SANITY_CRITICAL ? rnd(5, 9) : rnd(11, 17));
+  }
 
   /* last 10 seconds: red screen and heartbeat */
   const sec = Math.ceil(S.time);
@@ -477,7 +593,7 @@ function loop() {
 
 
 /* ============================================================
-   9. hallway (one long dark hallway with the 7 doors in order)
+   10. hallway (one long dark hallway with the 7 doors in order)
    walk forward by tapping, 3-4 taps between doors,
    one jumpscare on the way to every room
    ============================================================ */
@@ -576,6 +692,8 @@ function hallScare() {
   const pic = !!hallPics[n];
   $('#hscareImg').src = pic ? jumpscareFile(n) : '';
   const showIt = () => { hs.className = 'on ' + cfg.type + (pic ? ' pic' : ''); };
+
+  if (!changeSanity(-SANITY_HALL_LOSS, 'The apparition has shaken you. You lose some sanity.')) return;
 
   playJumpscare();
   if (cfg.type === 'lights') {                              // lights out first, then it appears
@@ -747,12 +865,13 @@ function drawHall(t) {
 
 
 /* ============================================================
-   10. scoring and room progress
+   11. scoring and room progress
    ============================================================ */
 
 /* wrong answer: lose time and shake the screen */
 function penalty() {
   S.time = Math.max(.1, S.time - PENALTY);
+  changeSanity(-SANITY_WRONG_LOSS, 'The house whispers inside your head. Your sanity drops.');
   tone(110, .3, 'square', .12);
   const g = $('#game');
   g.classList.remove('hit'); void g.offsetWidth; g.classList.add('hit');
@@ -779,6 +898,7 @@ function solve(type) {
 
 function roomCleared() {
   S.paused = true; S.busy = true;
+  changeSanity(SANITY_ROOM_RECOVERY, 'You take a breath. Your sanity recovers slightly.');
   tone(300, .4, 'triangle', .12);
   setTimeout(() => {
     if (S.room >= TOTAL_ROOMS) end(true);      // last room done: you win
@@ -792,11 +912,12 @@ function roomCleared() {
 
 
 /* ============================================================
-   11. game over and scoreboard
+   12. game over and scoreboard
    ============================================================ */
 
 /* time ran out: jumpscare, then the game over screen */
-function lose() {
+function lose(reason = 'time') {
+  if (S.done) return;
   S.done = true;
   if (H) H.alive = false;
   clearInterval(tick);
@@ -813,11 +934,13 @@ function lose() {
   }, JUMPSCARE_MS);
 }
 
-function end(won) {
+function end(won, lossReason = 'time') {
   S.done = true;
   if (H) H.alive = false;
   clearInterval(tick);
-  document.body.classList.remove('danger');
+  document.body.classList.remove('danger', 'sanity-wary', 'sanity-unsettled', 'sanity-critical', 'haunted');
+  $('#stage').classList.remove('sanity-glitch');
+  $('#sanityNotice').classList.remove('show');
   document.body.style.setProperty('--h', 18);
   startMusic();
 
@@ -855,7 +978,7 @@ function saveScore() {
 
 
 /* ============================================================
-   12. puzzle popup
+   13. puzzle popup
    ============================================================ */
 function openSpot(i) {
   if (EDIT || S.busy || S.done || S.solved[i]) return;
@@ -875,7 +998,7 @@ function closeModal() {
 
 
 /* ============================================================
-   13. puzzles
+   14. puzzles
    every puzzle gets harder with the room number,
    and nothing repeats inside one game
    ============================================================ */
