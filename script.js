@@ -1,16 +1,16 @@
 /* ============================================================
    la casa matusita - script.js
    escape the haunted house: solve 3 puzzles in every room
-   before the timer runs out
+   before the timer runs out (and before your sanity does)
    ------------------------------------------------------------
-    1. settings                  9. hallway (walk to the next room)
-    2. rooms and objects        10. scoring and room progress
-    3. helpers                  11. game over and scoreboard
-    4. saved data               12. puzzle popup
-    5. sound                    13. puzzles (candles, cards, riddle, lock)
-    6. game state               14. layout editor (?edit)
-    7. room scene (fisheye)     15. effects and buttons
-    8. timer
+    1. settings                 9. timer
+    2. rooms and objects       10. hallway (video + jumpscares)
+    3. helpers                 11. scoring and room progress
+    4. saved data              12. game over and scoreboard
+    5. sound                   13. puzzle popup
+    6. game state              14. puzzles (candles, cards, riddle, lock)
+    7. room scene (fisheye)    15. layout editor (?edit)
+    8. sanity system           16. effects and buttons
    ============================================================ */
 
 
@@ -39,13 +39,12 @@ const TIME_MIN    = 60;       // never less than this
 const PENALTY     = 5;        // seconds lost for a wrong answer
 const TIME_BONUS  = 5;        // points for every second left
 const JUMPSCARE_MS = 2200;    // how long the jumpscare lasts
-
 /* sanity system */
 const SANITY_MAX = 100;
 const SANITY_WRONG_LOSS = 7;       // wrong answers and hints
 const SANITY_HALL_LOSS = 7;        // hallway jumpscares
 const SANITY_HAUNT_LOSS = 5;       // random ghost encounter inside a room
-const SANITY_ROOM_RECOVERY = 10;  // regain sanity after clearing a room
+const SANITY_ROOM_RECOVERY = 10;   // regain sanity after clearing a room
 const SANITY_WARY = 75;
 const SANITY_UNSETTLED = 50;
 const SANITY_CRITICAL = 25;
@@ -59,7 +58,12 @@ const HALL_ARRIVE    = 2.5;    // how far before the door you stop
 const HALL_WALK_MS   = 850;    // how long one step takes
 const POINTS = { sequence: 500, match: 500, riddle: 400, code: 600 };
 
+/* hallway video: the first file that exists is used (if none is found, the drawn hallway is used) */
+const HALL_VIDEO = ['hallway.mp4', 'video/hallway.mp4', 'videos/hallway.mp4', 'music files/hallway.mp4'];
+const HALL_FIT   = 'cover';   // 'cover' = fills the whole screen (crops a bit), 'contain' = shows the whole picture
+
 /* look and feel (true / false) */
+const CUT_FACES  = true;      // false = jumpscare pictures are shown as they are (no background removal)
 const SHOW_ICONS = true;      // false = hide object pictures, keep only the glow
 const FLASHLIGHT = true;      // false = room is fully lit
 const STATIC_FX  = true;      // false = no static / creepy filter
@@ -247,7 +251,7 @@ function newGame() {
     used: { riddle: new Set(), code: new Set(), seq: new Set() }      // remembers puzzles already shown
   };
   clearInterval(tick);
-  document.body.classList.remove('sanity-wary', 'sanity-unsettled', 'sanity-critical');
+  document.body.classList.remove('sanity-wary', 'sanity-unsettled', 'sanity-critical', 'haunted');
   $('#stage').classList.remove('sanity-glitch');
   $('#sanityNotice').classList.remove('show');
   updateSanityUI();
@@ -263,13 +267,12 @@ function startRoom() {
   S.time   = S.max;
   S.busy   = false;
   S.solved = [false, false, false];
-   S.elapsed = 0;
+  S.elapsed = 0;                                                   // seconds spent in this room
   S.haunted = false;
-  S.hauntAt = rnd(16, Math.max(22, Math.floor(S.max * .65)));
+  S.hauntAt = rnd(16, Math.max(22, Math.floor(S.max * .65)));      // when the ghost shows up in this room
   S.nextGlitchAt = rnd(8, 12);
   lastSec = -1;
   updateSanityUI();
-
 
   document.body.style.setProperty('--h', R.hue);
   $('#hRoom').textContent  = S.room;
@@ -480,8 +483,11 @@ function updateCamera() {
   $('#camTime').textContent = `${HOURS[S.room - 1]}:${String(minutes).padStart(2, '0')} AM`;
 }
 
+
 /* ============================================================
    8. sanity system
+   wrong answers, hints and scares drain it, clearing a room gives a little back.
+   the lower it is, the more the camera distorts. at zero the house takes your mind.
    ============================================================ */
 let sanityNoticeTimer = null;
 
@@ -490,9 +496,7 @@ function updateSanityUI() {
 
   const value = Math.max(0, Math.min(SANITY_MAX, S.sanity));
   const percent = Math.ceil(value);
-  const fill = $('#sanityFill');
-  const text = $('#sanityText');
-  const hud = $('#sanityHud');
+  const fill = $('#sanityFill'), text = $('#sanityText'), hud = $('#sanityHud');
 
   if (fill) fill.style.width = percent + '%';
   if (text) text.textContent = percent + '%';
@@ -502,21 +506,21 @@ function updateSanityUI() {
   document.body.classList.toggle('sanity-unsettled', value <= SANITY_UNSETTLED && value > SANITY_CRITICAL);
   document.body.classList.toggle('sanity-critical', value <= SANITY_CRITICAL);
 
-  const hallSanity = $('#hallSanity');
+  const hallSanity = $('#hallSanity');                               // the sanity number in the hallway bar
   if (hallSanity) hallSanity.textContent = percent + '%';
 }
 
+/* small message at the bottom of the screen */
 function showSanityNotice(message) {
   const notice = $('#sanityNotice');
   if (!notice || !message) return;
-
   notice.textContent = message;
   notice.classList.add('show');
   clearTimeout(sanityNoticeTimer);
   sanityNoticeTimer = setTimeout(() => notice.classList.remove('show'), 2600);
 }
 
-/* Returns false when sanity reaches zero and the game ends. */
+/* changes sanity. gives back false when it reached zero (the game is over) */
 function changeSanity(amount, message = '') {
   if (!S || S.done || typeof S.sanity !== 'number') return false;
 
@@ -524,32 +528,23 @@ function changeSanity(amount, message = '') {
   S.sanity = Math.max(0, Math.min(SANITY_MAX, S.sanity + amount));
   updateSanityUI();
 
-  if (message && amount < 0) showSanityNotice(message);
-  if (message && amount > 0) showSanityNotice(message);
+  if (message) showSanityNotice(message);
+  if (amount < 0 && S.sanity < before) tone(S.sanity <= SANITY_CRITICAL ? 58 : 85, .22, 'sine', .13);
 
-  if (amount < 0 && S.sanity < before) {
-    tone(S.sanity <= SANITY_CRITICAL ? 58 : 85, .22, 'sine', .13);
-  }
-
-  if (S.sanity <= 0) {
-    lose('sanity');
-    return false;
-  }
+  if (S.sanity <= 0) { lose('sanity'); return false; }
   return true;
 }
 
-/* A short CCTV distortion that grows more frequent at low sanity. */
+/* short cctv distortion, more often when sanity is low */
 function triggerCameraGlitch() {
   if (S.done || !$('#game').classList.contains('active')) return;
-
-  const target = $('#stage');
-  target.classList.remove('sanity-glitch');
-  void target.offsetWidth;
-  target.classList.add('sanity-glitch');
-  setTimeout(() => target.classList.remove('sanity-glitch'), 520);
+  stage.classList.remove('sanity-glitch');
+  void stage.offsetWidth;
+  stage.classList.add('sanity-glitch');
+  setTimeout(() => stage.classList.remove('sanity-glitch'), 520);
 }
 
-/* One ghost encounter per room. It damages sanity but does not directly end the run. */
+/* one ghost encounter in every room: it hurts sanity but does not end the run by itself */
 function triggerRoomHaunting() {
   if (S.done || S.haunted || EDIT) return;
   S.haunted = true;
@@ -572,12 +567,13 @@ function loop() {
   S.time = Math.max(0, S.time - .1);
   $('#barFill').style.width  = (S.time / S.max * 100) + '%';
   $('#timeText').textContent = Math.ceil(S.time) + 's';
+  S.elapsed += .1;
   updateCamera();
 
-    // A single unsettling encounter happens at a random point in each room.
+  /* one unsettling encounter at a random moment in every room */
   if (!S.haunted && S.elapsed >= S.hauntAt) triggerRoomHaunting();
 
-  // The lower the sanity, the more often the CCTV briefly glitches.
+  /* the lower the sanity, the more often the camera glitches */
   if (S.sanity <= SANITY_UNSETTLED && S.elapsed >= S.nextGlitchAt) {
     triggerCameraGlitch();
     S.nextGlitchAt = S.elapsed + (S.sanity <= SANITY_CRITICAL ? rnd(5, 9) : rnd(11, 17));
@@ -611,15 +607,139 @@ const HALL_SCARES = [
   { type: 'long',   ms: 2000 }     // room 7: the big one
 ];
 
-const jumpscareFile = n => encodeURI(`${JUMPSCARE_ROOM}${n}.jpg`);
-const hallPics = {};                                // room number -> true when its picture loaded
+/* picture files of a hallway jumpscare: a ready-made cut-out jumpscare-room-N.png is used first, then the .jpg */
+const jumpscareFiles = n => [`${JUMPSCARE_ROOM}${n}.png`, `${JUMPSCARE_ROOM}${n}.jpg`].map(encodeURI);
+
+/* --- the hallway video: tries every path in HALL_VIDEO, 'failed' = use the drawn hallway instead --- */
+const hallVideo = $('#hallVideo'), hallBox = $('#hallFrame'), hallDoor = $('#hallDoor');
+let hallVideoState = 'loading';                     // loading | ok | failed
+(function loadHallVideo(i) {
+  if (i >= HALL_VIDEO.length) { hallVideoState = 'failed'; return; }
+  hallVideo.onerror = () => loadHallVideo(i + 1);
+  hallVideo.onloadeddata = () => { hallVideoState = 'ok'; };
+  hallVideo.src = encodeURI(HALL_VIDEO[i]);
+  hallVideo.load();
+})(0);
+
+/* --- the jumpscare faces: the background is removed so only the face shows --- */
+const hallPics = {}, hallSrc = {}, hallCut = {};    // room number -> loaded?, picture to show, background removed?
 for (let n = 1; n <= TOTAL_ROOMS; n++) {
-  const im = new Image();
-  im.onload = () => { hallPics[n] = true; };
-  im.src = jumpscareFile(n);
+  loadFace(jumpscareFiles(n)).then(r => { hallPics[n] = true; hallSrc[n] = r.src; hallCut[n] = r.cut; }).catch(() => {});
 }
 
-/* --- the plan: how many clicks between doors, and where every door is --- */
+/* loads the first picture that exists and (if CUT_FACES) removes its background. gives { src, cut }
+   a .png is used as it is (it is already a cut-out) */
+function loadFace(files, i = 0) {
+  files = [].concat(files);
+  return new Promise((resolve, reject) => {
+    if (i >= files.length) return reject('missing');
+    const im = new Image();
+    im.onerror = () => loadFace(files, i + 1).then(resolve, reject);       // not there: try the next file
+    im.onload = () => {
+      if (/\.png$/i.test(files[i])) return resolve({ src: files[i], cut: true });
+      let result = { src: files[i], cut: false };
+      if (CUT_FACES) { try { result = { src: cutFace(im), cut: true }; } catch {} }      // blocked or failed: show the picture as it is
+      resolve(result);
+    };
+    im.src = files[i];
+  });
+}
+
+/* background removal for a face picture:
+   1. the background color is read from the picture border
+   2. everything of that color that touches the border is removed (floods inwards, stops at the face)
+   3. only the biggest shape is kept (the face), the edge is softened and the picture is cropped to the face
+   if no plain background is found, the edges are just faded out in an oval */
+function cutFace(im) {
+  const k = Math.min(1, 900 / Math.max(im.naturalWidth, im.naturalHeight));
+  const w = Math.max(2, Math.round(im.naturalWidth * k)), h = Math.max(2, Math.round(im.naturalHeight * k)), n = w * h;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const g = cv.getContext('2d'); g.drawImage(im, 0, 0, w, h);
+  const img = g.getImageData(0, 0, w, h), d = img.data;       // throws if the browser blocks it
+
+  /* 1. background color from the border (average and how much it varies) */
+  const ring = Math.max(2, Math.round(Math.min(w, h) * .01)), edge = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (x < ring || y < ring || x >= w - ring || y >= h - ring) edge.push(y * w + x);
+  let mr = 0, mg = 0, mb = 0;
+  edge.forEach(i => { mr += d[i * 4]; mg += d[i * 4 + 1]; mb += d[i * 4 + 2]; });
+  mr /= edge.length; mg /= edge.length; mb /= edge.length;
+  let sd = 0;
+  edge.forEach(i => { sd += (d[i * 4] - mr) ** 2 + (d[i * 4 + 1] - mg) ** 2 + (d[i * 4 + 2] - mb) ** 2; });
+  sd = Math.sqrt(sd / edge.length / 3);
+  const plainBg = sd <= 38;                                   // a busy background can not be removed this way
+  const tol = Math.max(28, Math.min(80, 2 * sd + 18));
+  const near = i => Math.hypot(d[i * 4] - mr, d[i * 4 + 1] - mg, d[i * 4 + 2] - mb) / 1.732 < tol;
+
+  /* 2. flood the background inwards from the border */
+  const bg = new Uint8Array(n), todo = [];
+  const add = i => { if (!bg[i] && near(i)) { bg[i] = 1; todo.push(i); } };
+  if (plainBg) edge.forEach(add);
+  while (todo.length) {
+    const i = todo.pop(), x = i % w;
+    if (x > 0) add(i - 1);
+    if (x < w - 1) add(i + 1);
+    if (i >= w) add(i - w);
+    if (i < n - w) add(i + w);
+  }
+  let bgCount = 0; for (let i = 0; i < n; i++) bgCount += bg[i];
+
+  const alpha = new Float32Array(n);
+  const oval = () => {                                         // safe backup: fade the edges out in an oval
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const rho = Math.hypot((x / w - .5) / .5, (y / h - .5) / .5), t = Math.min(1, Math.max(0, (rho - .62) / .38));
+      alpha[y * w + x] = 1 - t * t * (3 - 2 * t);
+    }
+  };
+  if (bgCount < n * .04 || bgCount > n * .97) {
+    oval();                                                    // no plain background found
+  } else {
+    /* 3. keep only the biggest shape that is not background (the face) */
+    const label = new Int32Array(n); const sizes = [0]; let next = 0;
+    for (let s = 0; s < n; s++) {
+      if (bg[s] || label[s]) continue;
+      next++; sizes[next] = 0; label[s] = next; const stack = [s];
+      while (stack.length) {
+        const i = stack.pop(), x = i % w; sizes[next]++;
+        const nb = [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i >= w ? i - w : -1, i < n - w ? i + w : -1];
+        for (const j of nb) if (j >= 0 && !bg[j] && !label[j]) { label[j] = next; stack.push(j); }
+      }
+    }
+    const biggest = Math.max(...sizes);
+    let kept = 0;
+    for (let i = 0; i < n; i++) { alpha[i] = label[i] && sizes[label[i]] >= biggest * .05 ? 1 : 0; kept += alpha[i]; }
+    if (kept < n * .12) oval();                                // the "face" came out too small: it was not a plain background after all
+    else {
+
+    /* shave 1 pixel off the edge (no halo of old background), then soften the edge */
+    const copy = alpha.slice();
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      if (copy[i] && (!copy[i - 1] || !copy[i + 1] || !copy[i - w] || !copy[i + w])) alpha[i] = 0;
+    }
+    const tmp = new Float32Array(n), R = 2;
+    for (let pass = 0; pass < 2; pass++) {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let s = 0, c = 0; for (let o = -R; o <= R; o++) { const xx = x + o; if (xx >= 0 && xx < w) { s += alpha[y * w + xx]; c++; } } tmp[y * w + x] = s / c; }
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let s = 0, c = 0; for (let o = -R; o <= R; o++) { const yy = y + o; if (yy >= 0 && yy < h) { s += tmp[yy * w + x]; c++; } } alpha[y * w + x] = s / c; }
+    }
+    }
+  }
+
+  /* write the transparency and crop the picture to the face */
+  let x0 = w, y0 = h, x1 = 0, y1 = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const a = alpha[y * w + x]; d[(y * w + x) * 4 + 3] = Math.round(a * 255);
+    if (a > .08) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  if (x1 <= x0 || y1 <= y0) throw 'empty';
+  g.putImageData(img, 0, 0);
+  const pad = Math.round(Math.max(w, h) * .02);
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(w - 1, x1 + pad); y1 = Math.min(h - 1, y1 + pad);
+  const out = document.createElement('canvas'); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1;
+  out.getContext('2d').drawImage(cv, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+  return out.toDataURL('image/png');
+}
+
+/* --- the plan: how many clicks between doors, and which part of the video each click plays --- */
 function hallPlan() {
   const clicks = [], stops = [];
   let z = 0;
@@ -627,32 +747,53 @@ function hallPlan() {
     const c = rnd(HALL_MIN_CLICKS, HALL_MAX_CLICKS);        // 3 or 4 clicks to the next door
     z += c * HALL_STEP;
     clicks.push(c);
-    stops.push(z);                                          // where you stand in front of door k
+    stops.push(z);                                          // where you stand in front of door k (drawn hallway)
   }
-  return { clicks, stops };
+  /* video: the whole walk is shared between all the clicks of the game, so every click is the same length */
+  const length = isFinite(hallVideo.duration) && hallVideo.duration > 5 ? hallVideo.duration - 1.5 : 33;
+  const total = clicks.reduce((a, b) => a + b, 0);
+  let sum = 0;
+  const times = clicks.map(c => (sum += c) / total * length);    // video time at door k
+  return { clicks, stops, times };
 }
 
 /* --- start walking toward the door of the current room --- */
 function enterHall() {
-  const k = S.room - 1;
+  const k = S.room - 1, video = hallVideoState === 'ok';
   clearInterval(tick);
   document.body.classList.remove('danger');
   H = {
-    alive: true, k,
+    alive: true, k, mode: video ? 'video' : 'canvas',
     clicks: S.hall.clicks[k], step: 0,
-    cam: k ? S.hall.stops[k - 1] : 0,                       // you start where the last door was
+    cam: k ? S.hall.stops[k - 1] : 0,                       // drawn hallway: you start where the last door was
     moving: false, from: 0, to: 0, t0: 0, walkP: 0, foot: 0,
     scareAt: rnd(1, S.hall.clicks[k]), scared: false, scaring: false, dark: false,
     open: 0, opening: false, leaving: false
   };
-  $('#hhud').innerHTML = `<span>Hallway</span><span>Next: room <b>${S.room}</b>/${TOTAL_ROOMS}</span><span>Score <b>${S.score}</b></span>`;
+  const hall = $('#hall');
+  hall.classList.toggle('video', video);
+  hall.classList.remove('dark');
+  $('#hhud').innerHTML = `<span>Hallway</span><span>Next: room <b>${S.room}</b>/${TOTAL_ROOMS}</span><span>Score <b>${S.score}</b></span><span>Mind <b id="hallSanity">${Math.ceil(S.sanity)}%</b></span>`;
   show('hall');
   sizeHall();
+  hideDoor();
+  hallBox.classList.remove('enter');
+
+  if (video) {                                              // put the video where this walk starts
+    H.tStart = k ? S.hall.times[k - 1] : 0;
+    H.tEnd = S.hall.times[k];
+    H.stepMs = (H.tEnd - H.tStart) / H.clicks * 1000;
+    hallVideo.pause(); hallVideo.muted = muted; hallVideo.volume = 1;
+    if (Math.abs(hallVideo.currentTime - H.tStart) > .05) hallVideo.currentTime = H.tStart;
+  }
   hallHint();
   requestAnimationFrame(hallFrame);
 }
 
+/* the video is a square: size it so it fills the screen (or fits inside it) */
 function sizeHall() {
+  const w = $('#hall').clientWidth, h = $('#hall').clientHeight;
+  hallBox.style.setProperty('--S', (HALL_FIT === 'cover' ? Math.max(w, h) : Math.min(w, h)) + 'px');
   const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
   hallCanvas.width  = Math.max(2, Math.round(hallCanvas.clientWidth * dpr));
   hallCanvas.height = Math.max(2, Math.round(hallCanvas.clientHeight * dpr));
@@ -664,14 +805,54 @@ function hallHint() {
   $('#hhint').textContent = text;
 }
 
+/* --- the glowing door on top of the video: a door on the left or right wall, drawn in the same perspective --- */
+function doorShape(side) {
+  const vw = $('#hall').clientWidth, vh = $('#hall').clientHeight, S = HALL_FIT === 'cover' ? Math.max(vw, vh) : Math.min(vw, vh);
+  const xmin = Math.max(0, 50 - 50 * vw / S) + 3, ymin = Math.max(0, 50 - 50 * vh / S) + 4, ymax = Math.min(100, 50 + 50 * vh / S) - 6;
+  const d1 = Math.max(1, 48 / (50 - xmin), 40 / (47 - ymin), 45 / (ymax - 47)), d2 = d1 * 2.1;     // how near / far the door is
+  const X = d => 50 - 48 / d, T = d => 47 - 40 / d, B = d => 47 + 45 / d;                         // wall lines run to the middle of the picture
+  const pts = [[X(d1), T(d1)], [X(d2), T(d2)], [X(d2), B(d2)], [X(d1), B(d1)]].map(([x, y]) => [side < 0 ? x : 100 - x, y]);
+  return pts;
+}
+
+function showDoor() {
+  const q = doorShape(H.k % 2 ? 1 : -1), str = p => p.map(v => v.toFixed(2)).join(',');
+  const points = q.map(str).join(' '), cx = (q[0][0] + q[1][0]) / 2, cy = (q[0][1] + q[1][1]) / 2 + 3.5;
+  hallDoor.innerHTML =
+    `<polygon class="door-body" points="${points}"/>
+     <polygon class="door-glow" points="${points}"/>
+     <line class="door-light" x1="${str(q[3]).split(',')[0]}" y1="${str(q[3]).split(',')[1]}" x2="${str(q[2]).split(',')[0]}" y2="${str(q[2]).split(',')[1]}"/>
+     <rect class="plate" x="${(cx - 2.6).toFixed(2)}" y="${(cy - 2).toFixed(2)}" width="5.2" height="4" rx=".6"/>
+     <text x="${cx.toFixed(2)}" y="${cy.toFixed(2)}">${H.k + 1}</text>`;
+  hallDoor.removeAttribute('hidden');                      // (svg has no .hidden property)
+  H.doorAt = [(q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4];
+}
+function hideDoor() { hallDoor.setAttribute('hidden', ''); hallDoor.innerHTML = ''; }
+
 /* --- one tap: walk one step, or open the door when you are at it --- */
 function hallTap() {
   if (!H || !H.alive || H.moving || H.scaring || H.opening) return;
   if (H.step < H.clicks) {
-    H.moving = true; H.from = H.cam; H.to = H.cam + HALL_STEP; H.t0 = performance.now(); H.foot = 0;
+    if (H.mode === 'video') {                               // play the next piece of the video
+      H.tTarget = H.tStart + (H.tEnd - H.tStart) * (H.step + 1) / H.clicks;
+      H.moving = true; H.foot = 0; H.t0 = performance.now();
+      hideDoor();
+      hallVideo.play().catch(() => { hallVideo.currentTime = H.tTarget; });
+    } else {
+      H.moving = true; H.from = H.cam; H.to = H.cam + HALL_STEP; H.t0 = performance.now(); H.foot = 0;
+    }
   } else {
     H.opening = true; H.o0 = performance.now(); H.camOpen = H.cam;
     tone(150, .7, 'sawtooth', .05);                         // creaky door
+    if (H.mode === 'video') {                               // zoom into the door, then fade into the room
+      hallBox.style.transformOrigin = H.doorAt ? `${H.doorAt[0]}% ${H.doorAt[1]}%` : '50% 50%';
+      hallBox.classList.add('enter');
+      setTimeout(() => {
+        if (!H || !H.alive || H.leaving) return;
+        H.leaving = true;
+        fadeTo(() => { H.alive = false; show('game'); startRoom(); hallBox.classList.remove('enter'); });
+      }, 750);
+    }
   }
   hallHint();
 }
@@ -685,26 +866,36 @@ function afterStep() {
   } else hallHint();
 }
 
-/* --- the jumpscare of this room (picture + effect) --- */
+/* lights out / lights on in the hallway */
+function setDark(on) { if (H) H.dark = on; $('#hall').classList.toggle('dark', on); }
+
+/* --- the jumpscare of this room (face picture + effect) --- */
 function hallScare() {
   if (!H || !H.alive) return;
   const n = S.room, cfg = HALL_SCARES[n - 1], hs = $('#hscare');
   const pic = !!hallPics[n];
-  $('#hscareImg').src = pic ? jumpscareFile(n) : '';
-  const showIt = () => { hs.className = 'on ' + cfg.type + (pic ? ' pic' : ''); };
+  $('#hscareImg').src = pic ? hallSrc[n] : '';
+  const showIt = () => { hs.className = 'on ' + cfg.type + (pic ? ' pic' : '') + (pic && hallCut[n] ? ' cut' : ''); };
 
-  if (!changeSanity(-SANITY_HALL_LOSS, 'The apparition has shaken you. You lose some sanity.')) return;
+  if (!changeSanity(-SANITY_HALL_LOSS, 'The apparition shakes you. You lose some sanity.')) return;     // sanity gone: game over
 
   playJumpscare();
   if (cfg.type === 'lights') {                              // lights out first, then it appears
-    H.dark = true; tone(45, .9, 'sawtooth', .18);
-    setTimeout(() => { H.dark = false; showIt(); }, 1000);
+    setDark(true); tone(45, .9, 'sawtooth', .18);
+    setTimeout(() => { setDark(false); showIt(); }, 1000);
   } else showIt();
 
   setTimeout(() => {
     hs.className = ''; jumpSnd.pause();
-    if (H) { H.dark = false; H.scaring = false; hallHint(); }
+    setDark(false);
+    if (H) { H.scaring = false; hallHint(); }
   }, cfg.ms);
+}
+
+/* stop walking (game over, or the game ends) */
+function stopHall() {
+  if (H) H.alive = false;
+  hallVideo.pause();
 }
 
 /* --- every frame: move the camera, then draw --- */
@@ -713,6 +904,23 @@ const ease = p => p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
 function hallFrame(now) {
   if (!H || !H.alive) return;
 
+  /* video walk: the video plays by itself, we only stop it at the end of the step */
+  if (H.mode === 'video') {
+    if (H.moving) {
+      const p = (performance.now() - H.t0) / H.stepMs;
+      if (p > .22 && H.foot === 0) { H.foot = 1; tone(55, .14, 'sine', .22); }          // footsteps
+      if (p > .72 && H.foot === 1) { H.foot = 2; tone(50, .14, 'sine', .22); }
+      if (hallVideo.currentTime >= H.tTarget - .03 || hallVideo.ended || performance.now() - H.t0 > H.stepMs + 1500) {
+        hallVideo.pause(); H.moving = false; H.step++;
+        if (H.step >= H.clicks) showDoor();                 // you arrived: the door glows
+        afterStep();
+      }
+    }
+    requestAnimationFrame(hallFrame);
+    return;
+  }
+
+  /* drawn hallway (backup) */
   if (H.moving) {                                           // walking one step
     const p = Math.min(1, (now - H.t0) / HALL_WALK_MS);
     H.walkP = p; H.cam = H.from + (H.to - H.from) * ease(p);
@@ -915,11 +1123,11 @@ function roomCleared() {
    12. game over and scoreboard
    ============================================================ */
 
-/* time ran out: jumpscare, then the game over screen */
+/* time ran out (or sanity reached zero): jumpscare, then the game over screen */
 function lose(reason = 'time') {
   if (S.done) return;
   S.done = true;
-  if (H) H.alive = false;
+  stopHall();
   clearInterval(tick);
   document.body.classList.remove('danger');
   closeModal();
@@ -930,17 +1138,18 @@ function lose(reason = 'time') {
   setTimeout(() => {
     $('#scare').classList.remove('on');
     jumpSnd.pause();
-    end(false);
+    end(false, reason);
   }, JUMPSCARE_MS);
 }
 
-function end(won, lossReason = 'time') {
+function end(won, reason = 'time') {
   S.done = true;
-  if (H) H.alive = false;
+  stopHall();
   clearInterval(tick);
   document.body.classList.remove('danger', 'sanity-wary', 'sanity-unsettled', 'sanity-critical', 'haunted');
-  $('#stage').classList.remove('sanity-glitch');
+  stage.classList.remove('sanity-glitch');
   $('#sanityNotice').classList.remove('show');
+  $('#hall').classList.remove('dark');
   document.body.style.setProperty('--h', 18);
   startMusic();
 
@@ -949,7 +1158,8 @@ function end(won, lossReason = 'time') {
 
   $('#oTitle').textContent = won ? 'You escaped' : 'The house keeps you';
   $('#oText').textContent  = won ? 'The front door finally opens. Do not look back.'
-                                 : `The lights go out. The ${ROOMS[S.room - 1].name} is yours forever.`;
+    : reason === 'sanity' ? `Your mind slips away in the dark. The ${ROOMS[S.room - 1].name} keeps what is left of you.`
+    : `The lights go out. The ${ROOMS[S.room - 1].name} is yours forever.`;
   $('#oScore').textContent = S.score;
   $('#oRoom').textContent  = won ? TOTAL_ROOMS : S.room - 1;
   $('#oBest').textContent  = isNew ? 'New high score!' : 'High score: ' + best;
@@ -1203,7 +1413,7 @@ const PUZ = {
 
 
 /* ============================================================
-   14. layout editor (open index.html?edit)
+   15. layout editor (open index.html?edit)
    drag = move an object, mouse wheel = resize it
    ============================================================ */
 function showLayout() {
@@ -1260,7 +1470,7 @@ if (EDIT) {
 
 
 /* ============================================================
-   15. effects and buttons
+   16. effects and buttons
    ============================================================ */
 
 /* --- fullscreen --- */
@@ -1274,8 +1484,11 @@ function toggleFull() {
 if (!document.documentElement.requestFullscreen) $('#full').hidden = true;     // iphone safari has no fullscreen
 
 /* --- jumpscare picture (loads early so it shows instantly) --- */
-$('#scareImg').onload = () => $('#scare').classList.add('pic');
-$('#scareImg').src = JUMPSCARE_IMG;
+loadFace([JUMPSCARE_IMG.replace(/\.jpg$/, '.png'), JUMPSCARE_IMG]).then(r => {
+  $('#scareImg').src = r.src;
+  $('#scare').classList.add('pic');
+  if (r.cut) $('#scare').classList.add('cut');
+}).catch(() => {});
 
 /* --- flashlight follows your finger / mouse --- */
 ['pointermove', 'pointerdown'].forEach(name => stage.addEventListener(name, e => {
@@ -1291,7 +1504,7 @@ $('#cctv').hidden = !CCTV;
 $('#static').hidden = !STATIC_FX;
 
 /* --- hallway: tap / click / keys to walk, resize --- */
-hallCanvas.addEventListener('pointerdown', hallTap);
+$('#hall').addEventListener('pointerdown', hallTap);
 window.addEventListener('resize', () => { if (H && H.alive) sizeHall(); });
 document.addEventListener('keydown', e => {
   if (['ArrowUp', 'w', 'W', ' ', 'Enter'].includes(e.key) && $('#hall').classList.contains('active')) { e.preventDefault(); hallTap(); }
@@ -1311,6 +1524,7 @@ $('#initials').onkeydown = e => { if (e.key === 'Enter') saveScore(); };
 $('#mute').onclick = e => {
   muted = !muted;
   e.target.textContent = muted ? '🔇' : '🔊';
+  hallVideo.muted = muted;
   muted ? bgm.pause() : startMusic();
 };
 

@@ -59,8 +59,7 @@
         <li>Every room is harder: less time and trickier puzzles. No puzzle repeats.</li>
         <li>Each puzzle gives points (400 to 600) plus 5 points for every second left.</li>
         <li>A wrong answer costs 5 seconds. If time hits zero, the house gets you.</li>
-        <li>As sanity drops, the CCTV becomes distorted. If your sanity reaches zero, the house takes your mind.</li>
-        <li>If time hits zero, the house gets you.</li>
+        <li>Wrong answers and hallway scares drain your sanity. As it drops, the CCTV becomes distorted. If your sanity reaches zero, the house takes your mind.</li>
         <li>Controls: mouse, touch, or keyboard (type answers, press Enter).</li>
         <li>Escape all 7 rooms to win. Your best score is saved in this browser.</li>
       </ul>
@@ -131,7 +130,11 @@
 
   <!-- ============ screen: the hallway between rooms ============ -->
   <section id="hall" class="screen">
-    <canvas id="hallCanvas"></canvas>
+    <div id="hallFrame">                                    <!-- your hallway video + the glowing door on top -->
+      <video id="hallVideo" playsinline preload="auto"></video>
+      <svg id="hallDoor" viewBox="0 0 100 100" preserveAspectRatio="none" hidden></svg>
+    </div>
+    <canvas id="hallCanvas"></canvas>                       <!-- backup hallway, only used if the video is missing -->
     <header id="hhud"></header>
     <p id="hhint" aria-live="polite"></p>
   </section>
